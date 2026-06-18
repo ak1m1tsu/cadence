@@ -17,6 +17,6 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Subscriptions'), findsOneWidget);
+    expect(find.text('Payments'), findsOneWidget);
   });
 }
