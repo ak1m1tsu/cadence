@@ -41,8 +41,8 @@ test:
 	flutter test
 
 build:
-	flutter build apk --release
-	flutter build appbundle --release
+	flutter build apk --release --no-tree-shake-icons
+	flutter build appbundle --release --no-tree-shake-icons
 
 clean:
 	flutter clean

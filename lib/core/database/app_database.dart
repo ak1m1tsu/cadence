@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter/material.dart' show Icons;
 
@@ -69,6 +70,7 @@ class CurrencyRatesCache extends Table {
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'tracer_db'));
+  AppDatabase.inMemory() : super(NativeDatabase.memory());
 
   @override
   int get schemaVersion => 5;
