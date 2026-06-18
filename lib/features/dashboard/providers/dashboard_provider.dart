@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show DateTimeRange;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
@@ -59,18 +60,14 @@ class DashboardData {
   final double yearlyTotal;
   final String baseCurrency;
   final int paymentCount;
-  /// 12 calendar months, index 0 = 11 months ago, index 11 = current month.
-  final List<PeriodData> monthlyPeriods;
-  /// 3 calendar years, index 0 = 2 years ago, index 2 = current year.
-  final List<PeriodData> yearlyPeriods;
+  final int categoryCount;
 
   const DashboardData({
     required this.monthlyTotal,
     required this.yearlyTotal,
     required this.baseCurrency,
     required this.paymentCount,
-    required this.monthlyPeriods,
-    required this.yearlyPeriods,
+    required this.categoryCount,
   });
 
   static const empty = DashboardData(
@@ -78,12 +75,11 @@ class DashboardData {
     yearlyTotal: 0,
     baseCurrency: 'USD',
     paymentCount: 0,
-    monthlyPeriods: [],
-    yearlyPeriods: [],
+    categoryCount: 0,
   );
 }
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
+// ─── Main provider ────────────────────────────────────────────────────────────
 
 final dashboardProvider = FutureProvider<DashboardData>((ref) async {
   final allPayments = ref.watch(paymentsProvider).valueOrNull ?? [];
@@ -98,36 +94,19 @@ final dashboardProvider = FutureProvider<DashboardData>((ref) async {
       .getAllMappings();
 
   final base = settings.baseCurrency;
-  final now = DateTime.now();
 
   double totalMonthly = 0;
-
   for (final payment in allPayments) {
     final cycle = BillingCycle.fromDb(payment.billingCycle);
-    final convertedPrice =
+    final converted =
         await currencyService.convert(payment.price, payment.currencyCode, base);
     totalMonthly +=
-        toMonthlyAmount(convertedPrice, cycle, periodInterval: payment.periodInterval);
+        toMonthlyAmount(converted, cycle, periodInterval: payment.periodInterval);
   }
 
-  // 12 calendar months (oldest → newest, index 11 = current month).
-  final monthlyPeriods = <PeriodData>[];
-  for (var i = 11; i >= 0; i--) {
-    final from = DateTime(now.year, now.month - i, 1);
-    final to = DateTime(now.year, now.month - i + 1, 1);
-    final byCat = await _buildPeriodSpend(
-        allPayments, catMappings, from, to, currencyService, base);
-    monthlyPeriods.add(PeriodData(from: from, to: to, byCategory: byCat));
-  }
-
-  // 3 calendar years (oldest → newest, index 2 = current year).
-  final yearlyPeriods = <PeriodData>[];
-  for (var i = 2; i >= 0; i--) {
-    final from = DateTime(now.year - i, 1, 1);
-    final to = DateTime(now.year - i + 1, 1, 1);
-    final byCat = await _buildPeriodSpend(
-        allPayments, catMappings, from, to, currencyService, base);
-    yearlyPeriods.add(PeriodData(from: from, to: to, byCategory: byCat));
+  final usedCats = <String>{};
+  for (final cats in catMappings.values) {
+    for (final cat in cats) { usedCats.add(cat.name); }
   }
 
   return DashboardData(
@@ -135,10 +114,103 @@ final dashboardProvider = FutureProvider<DashboardData>((ref) async {
     yearlyTotal: totalMonthly * 12,
     baseCurrency: base,
     paymentCount: allPayments.length,
-    monthlyPeriods: monthlyPeriods,
-    yearlyPeriods: yearlyPeriods,
+    categoryCount: usedCats.length,
   );
 });
+
+// ─── On-demand period providers ───────────────────────────────────────────────
+
+/// Computes spending data for a single calendar month.
+/// [monthStart] must be the first day of the month (day = 1).
+final monthPeriodProvider =
+    FutureProvider.family<PeriodData, DateTime>((ref, monthStart) async {
+  final allPayments = ref.watch(paymentsProvider).valueOrNull ?? [];
+  final from = monthStart;
+  final to = DateTime(monthStart.year, monthStart.month + 1, 1);
+
+  if (allPayments.isEmpty) {
+    return PeriodData(from: from, to: to, byCategory: {});
+  }
+
+  final catMappings = await ref
+      .read(appDatabaseProvider)
+      .paymentCategoriesDao
+      .getAllMappings();
+  final settings = ref.watch(settingsProvider);
+  final currencyService = ref.read(currencyServiceProvider);
+
+  final byCat = await _buildPeriodSpend(
+    allPayments, catMappings, from, to, currencyService, settings.baseCurrency,
+  );
+  return PeriodData(from: from, to: to, byCategory: byCat);
+});
+
+/// Computes spending data for a full calendar year.
+final yearPeriodProvider =
+    FutureProvider.family<PeriodData, int>((ref, year) async {
+  final allPayments = ref.watch(paymentsProvider).valueOrNull ?? [];
+  final from = DateTime(year, 1, 1);
+  final to = DateTime(year + 1, 1, 1);
+
+  if (allPayments.isEmpty) {
+    return PeriodData(from: from, to: to, byCategory: {});
+  }
+
+  final catMappings = await ref
+      .read(appDatabaseProvider)
+      .paymentCategoriesDao
+      .getAllMappings();
+  final settings = ref.watch(settingsProvider);
+  final currencyService = ref.read(currencyServiceProvider);
+
+  final byCat = await _buildPeriodSpend(
+    allPayments, catMappings, from, to, currencyService, settings.baseCurrency,
+  );
+  return PeriodData(from: from, to: to, byCategory: byCat);
+});
+
+// ─── Carousel navigation state ────────────────────────────────────────────────
+// Kept in Riverpod so the position survives widget disposal (e.g. dashboardProvider reload).
+
+DateTime _currentMonthStart() {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, 1);
+}
+
+final viewedMonthProvider = StateProvider<DateTime>((ref) => _currentMonthStart());
+
+final viewedYearProvider = StateProvider<int>((ref) => DateTime.now().year);
+
+// ─── Custom date range ────────────────────────────────────────────────────────
+
+final customRangeProvider = StateProvider<DateTimeRange?>((ref) => null);
+
+final customPeriodProvider = FutureProvider<PeriodData?>((ref) async {
+  final range = ref.watch(customRangeProvider);
+  if (range == null) return null;
+
+  final allPayments = ref.watch(paymentsProvider).valueOrNull ?? [];
+  if (allPayments.isEmpty) {
+    return PeriodData(from: range.start, to: range.end, byCategory: {});
+  }
+
+  final catMappings = await ref
+      .read(appDatabaseProvider)
+      .paymentCategoriesDao
+      .getAllMappings();
+  final settings = ref.watch(settingsProvider);
+  final currencyService = ref.read(currencyServiceProvider);
+
+  // `to` is exclusive — advance end by 1 day so the end date is included.
+  final to = range.end.add(const Duration(days: 1));
+  final byCat = await _buildPeriodSpend(
+    allPayments, catMappings, range.start, to, currencyService, settings.baseCurrency,
+  );
+
+  return PeriodData(from: range.start, to: to, byCategory: byCat);
+});
+
+// ─── Shared computation ───────────────────────────────────────────────────────
 
 Future<Map<String, CategorySpend>> _buildPeriodSpend(
   List<Payment> payments,
@@ -153,19 +225,14 @@ Future<Map<String, CategorySpend>> _buildPeriodSpend(
     final cycle = BillingCycle.fromDb(payment.billingCycle);
     final startDate = DateTime.fromMillisecondsSinceEpoch(payment.startDate);
 
-    // Walk forward from the first renewal after startDate.
-    // nextRenewalDate returns a future date, so we instead advance manually
-    // from startDate to correctly find renewals in any historical period.
     var d = advanceByCycle(startDate, cycle, payment.periodInterval);
 
-    // Fast-forward to the period window.
     while (d.isBefore(from)) {
       final next = advanceByCycle(d, cycle, payment.periodInterval);
       if (!next.isAfter(d)) break;
       d = next;
     }
 
-    // Count every renewal that falls within [from, to).
     while (d.isBefore(to)) {
       if (!d.isBefore(from)) {
         final converted =

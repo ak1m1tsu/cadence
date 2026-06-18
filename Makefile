@@ -51,5 +51,10 @@ release:
 ifndef v
 	$(error Specify version: make release v=1.2.3)
 endif
-	git tag v$(v)
-	git push origin v$(v)
+	@BUILD=$$(grep '^version:' pubspec.yaml | sed 's/.*+//'); \
+	NEW_BUILD=$$((BUILD + 1)); \
+	sed -i "s/^version:.*/version: $(v)+$$NEW_BUILD/" pubspec.yaml; \
+	git add pubspec.yaml; \
+	git commit -m "chore: bump version to $(v)+$$NEW_BUILD"; \
+	git tag v$(v); \
+	git push origin master v$(v)

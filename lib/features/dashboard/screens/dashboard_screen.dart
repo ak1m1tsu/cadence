@@ -34,22 +34,18 @@ class DashboardScreen extends ConsumerWidget {
                     subtitle: 'Add payments to see your spending summary.',
                   ),
                 if (data.paymentCount > 0) ...[
-                SpendingSummaryCard(
-                  monthlyTotal: data.monthlyTotal,
-                  yearlyTotal: data.yearlyTotal,
-                  currency: data.baseCurrency,
-                ),
-                _StatsGrid(data: data),
-                const SizedBox(height: 8),
-                if (data.monthlyPeriods.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: _PeriodCarousel(
-                      monthlyPeriods: data.monthlyPeriods,
-                      yearlyPeriods: data.yearlyPeriods,
-                    ),
+                  SpendingSummaryCard(
+                    monthlyTotal: data.monthlyTotal,
+                    yearlyTotal: data.yearlyTotal,
+                    currency: data.baseCurrency,
                   ),
-                const SizedBox(height: 24),
+                  _StatsGrid(data: data),
+                  const SizedBox(height: 8),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: _PeriodCarousel(),
+                  ),
+                  const SizedBox(height: 24),
                 ],
               ],
             ),
@@ -70,12 +66,9 @@ class _StatsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final catCount = data.monthlyPeriods.isNotEmpty
-        ? data.monthlyPeriods.last.byCategory.length
-        : 0;
     final stats = [
       ('Active', '${data.paymentCount}', Icons.credit_card),
-      ('Categories', '$catCount', Icons.category_outlined),
+      ('Categories', '${data.categoryCount}', Icons.category_outlined),
     ];
 
     return Padding(
@@ -111,82 +104,105 @@ class _StatsGrid extends StatelessWidget {
 
 // ─── Period carousel ──────────────────────────────────────────────────────────
 
-enum _Granularity { month, year }
+enum _Granularity { month, year, custom }
 
-class _PeriodCarousel extends StatefulWidget {
-  final List<PeriodData> monthlyPeriods;
-  final List<PeriodData> yearlyPeriods;
-
-  const _PeriodCarousel({
-    required this.monthlyPeriods,
-    required this.yearlyPeriods,
-  });
+class _PeriodCarousel extends ConsumerStatefulWidget {
+  const _PeriodCarousel();
 
   @override
-  State<_PeriodCarousel> createState() => _PeriodCarouselState();
+  ConsumerState<_PeriodCarousel> createState() => _PeriodCarouselState();
 }
 
-class _PeriodCarouselState extends State<_PeriodCarousel> {
+class _PeriodCarouselState extends ConsumerState<_PeriodCarousel> {
   _Granularity _granularity = _Granularity.month;
-  late final PageController _monthCtrl;
-  late final PageController _yearCtrl;
-  late int _monthPage;
-  late int _yearPage;
 
-  @override
-  void initState() {
-    super.initState();
-    _monthPage = widget.monthlyPeriods.length - 1;
-    _yearPage = widget.yearlyPeriods.length - 1;
-    _monthCtrl = PageController(initialPage: _monthPage);
-    _yearCtrl = PageController(initialPage: _yearPage);
+  final _now = DateTime.now();
+
+  // ── Month navigation ──────────────────────────────────────────────────────
+
+  DateTime get _viewedMonth => ref.read(viewedMonthProvider);
+
+  bool get _isCurrentMonth =>
+      _viewedMonth.year == _now.year && _viewedMonth.month == _now.month;
+
+  bool get _isMinMonth => _viewedMonth.year <= 2000 && _viewedMonth.month == 1;
+
+  void _prevMonth() {
+    if (_isMinMonth) return;
+    final m = _viewedMonth;
+    ref.read(viewedMonthProvider.notifier).state =
+        DateTime(m.year, m.month - 1, 1);
   }
 
-  @override
-  void dispose() {
-    _monthCtrl.dispose();
-    _yearCtrl.dispose();
-    super.dispose();
+  void _nextMonth() {
+    if (_isCurrentMonth) return;
+    final m = _viewedMonth;
+    ref.read(viewedMonthProvider.notifier).state =
+        DateTime(m.year, m.month + 1, 1);
   }
 
-  List<PeriodData> get _periods =>
-      _granularity == _Granularity.month
-          ? widget.monthlyPeriods
-          : widget.yearlyPeriods;
+  // ── Year navigation ───────────────────────────────────────────────────────
 
-  PageController get _ctrl =>
-      _granularity == _Granularity.month ? _monthCtrl : _yearCtrl;
+  int get _viewedYear => ref.read(viewedYearProvider);
 
-  int get _currentPage =>
-      _granularity == _Granularity.month ? _monthPage : _yearPage;
+  bool get _isCurrentYear => _viewedYear == _now.year;
+  bool get _isMinYear => _viewedYear <= 2000;
 
-  void _setPage(int page) {
-    if (_granularity == _Granularity.month) {
-      setState(() => _monthPage = page);
+  void _prevYear() {
+    if (_isMinYear) return;
+    ref.read(viewedYearProvider.notifier).state = _viewedYear - 1;
+  }
+
+  void _nextYear() {
+    if (_isCurrentYear) return;
+    ref.read(viewedYearProvider.notifier).state = _viewedYear + 1;
+  }
+
+  // ── Custom range ──────────────────────────────────────────────────────────
+
+  Future<void> _pickCustomRange() async {
+    final current = ref.read(customRangeProvider);
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      initialDateRange: current,
+    );
+    if (picked != null) {
+      ref.read(customRangeProvider.notifier).state = picked;
+    }
+  }
+
+  Future<void> _onGranularityChanged(_Granularity g) async {
+    if (g == _Granularity.custom) {
+      final before = ref.read(customRangeProvider);
+      await _pickCustomRange();
+      final after = ref.read(customRangeProvider);
+      if (after == null && before == null) return;
+    }
+    setState(() => _granularity = g);
+  }
+
+  // ── Swipe ─────────────────────────────────────────────────────────────────
+
+  void _onSwipe(double velocity, {required bool isMonth}) {
+    if (isMonth) {
+      if (velocity < -200) _nextMonth();
+      if (velocity > 200) _prevMonth();
     } else {
-      setState(() => _yearPage = page);
+      if (velocity < -200) _nextYear();
+      if (velocity > 200) _prevYear();
     }
   }
 
-  String _periodLabel(PeriodData p) {
-    if (_granularity == _Granularity.month) {
-      return DateFormat('MMMM yyyy').format(p.from);
-    }
-    return DateFormat('yyyy').format(p.from);
-  }
-
-  bool _isCurrent(int index) => index == _periods.length - 1;
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final periods = _periods;
-    final currentPage = _currentPage;
-    final period = periods[currentPage];
 
     return Column(
       children: [
-        // Month / Year toggle
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: SegmentedButton<_Granularity>(
@@ -202,10 +218,15 @@ class _PeriodCarouselState extends State<_PeriodCarousel> {
                 icon: Icon(Icons.calendar_today, size: 16),
                 label: Text('Year'),
               ),
+              ButtonSegment(
+                value: _Granularity.custom,
+                icon: Icon(Icons.date_range, size: 16),
+                label: Text('Custom'),
+              ),
             ],
             selected: {_granularity},
-            onSelectionChanged: (s) => setState(() => _granularity = s.first),
-            style: ButtonStyle(
+            onSelectionChanged: (s) => _onGranularityChanged(s.first),
+            style: const ButtonStyle(
               visualDensity: VisualDensity.compact,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
@@ -213,7 +234,46 @@ class _PeriodCarouselState extends State<_PeriodCarousel> {
         ),
         const SizedBox(height: 12),
 
-        // Navigation row: < period label >
+        if (_granularity == _Granularity.custom)
+          _buildCustomView(theme)
+        else
+          _buildPeriodView(theme),
+      ],
+    );
+  }
+
+  Widget _buildPeriodView(ThemeData theme) {
+    final isMonth = _granularity == _Granularity.month;
+
+    // watch so rebuild fires when the user navigates
+    final viewedMonth = ref.watch(viewedMonthProvider);
+    final viewedYear = ref.watch(viewedYearProvider);
+
+    final isCurrentMonth =
+        viewedMonth.year == _now.year && viewedMonth.month == _now.month;
+    final isMinMonth = viewedMonth.year <= 2000 && viewedMonth.month == 1;
+    final isCurrentYear = viewedYear == _now.year;
+    final isMinYear = viewedYear <= 2000;
+
+    final isPrevDisabled = isMonth ? isMinMonth : isMinYear;
+    final isNextDisabled = isMonth ? isCurrentMonth : isCurrentYear;
+    final isCurrent = isNextDisabled;
+
+    final label = isMonth
+        ? DateFormat('MMMM yyyy').format(viewedMonth)
+        : '$viewedYear';
+
+    final periodAsync = isMonth
+        ? ref.watch(monthPeriodProvider(viewedMonth))
+        : ref.watch(yearPeriodProvider(viewedYear));
+
+    final animationKey = isMonth
+        ? ValueKey('$_granularity-${viewedMonth.year}-${viewedMonth.month}')
+        : ValueKey('$_granularity-$viewedYear');
+
+    return Column(
+      children: [
+        // Nav row
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Row(
@@ -221,20 +281,17 @@ class _PeriodCarouselState extends State<_PeriodCarousel> {
             children: [
               IconButton(
                 icon: const Icon(Icons.chevron_left),
-                onPressed: currentPage > 0
-                    ? () => _ctrl.previousPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut)
-                    : null,
+                onPressed:
+                    isPrevDisabled ? null : (isMonth ? _prevMonth : _prevYear),
               ),
               Column(
                 children: [
                   Text(
-                    _periodLabel(period),
+                    label,
                     style: theme.textTheme.titleSmall
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
-                  if (_isCurrent(currentPage))
+                  if (isCurrent)
                     Text(
                       'current',
                       style: theme.textTheme.labelSmall
@@ -244,59 +301,126 @@ class _PeriodCarouselState extends State<_PeriodCarousel> {
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right),
-                onPressed: currentPage < periods.length - 1
-                    ? () => _ctrl.nextPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut)
-                    : null,
+                onPressed:
+                    isNextDisabled ? null : (isMonth ? _nextMonth : _nextYear),
               ),
             ],
           ),
         ),
 
-        // Pie chart PageView — keyed by granularity so controllers reset on switch
-        SizedBox(
-          height: 290,
-          child: _granularity == _Granularity.month
-              ? PageView.builder(
-                  key: const ValueKey(_Granularity.month),
-                  controller: _monthCtrl,
-                  itemCount: widget.monthlyPeriods.length,
-                  onPageChanged: _setPage,
-                  itemBuilder: (_, i) => CategoryBreakdownChart(
-                    byCategory: widget.monthlyPeriods[i].byCategory,
-                  ),
-                )
-              : PageView.builder(
-                  key: const ValueKey(_Granularity.year),
-                  controller: _yearCtrl,
-                  itemCount: widget.yearlyPeriods.length,
-                  onPageChanged: _setPage,
-                  itemBuilder: (_, i) => CategoryBreakdownChart(
-                    byCategory: widget.yearlyPeriods[i].byCategory,
-                  ),
-                ),
+        // Chart with swipe detection
+        GestureDetector(
+          onHorizontalDragEnd: (d) =>
+              _onSwipe(d.primaryVelocity ?? 0, isMonth: isMonth),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            transitionBuilder: (child, animation) =>
+                FadeTransition(opacity: animation, child: child),
+            child: SizedBox(
+              key: animationKey,
+              height: 290,
+              child: periodAsync.when(
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('Error: $e')),
+                data: (period) {
+                  if (period.byCategory.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No payments this ${isMonth ? 'month' : 'year'}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
+                      ),
+                    );
+                  }
+                  return CategoryBreakdownChart(byCategory: period.byCategory);
+                },
+              ),
+            ),
+          ),
         ),
 
-        // Dot indicator
+        // 3-dot position indicator
         const SizedBox(height: 6),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: periods.asMap().entries.map((e) {
-            final isActive = e.key == currentPage;
+          children: List.generate(3, (i) {
+            final isCenterDot = i == 1;
+            final hasPage = i == 0
+                ? !isPrevDisabled
+                : i == 2
+                    ? !isNextDisabled
+                    : true;
             return AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: isActive ? 16 : 6,
+              width: isCenterDot ? 16 : 6,
               height: 6,
               margin: const EdgeInsets.only(right: 4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(3),
-                color: isActive
+                color: isCenterDot
                     ? theme.colorScheme.primary
-                    : theme.colorScheme.outlineVariant,
+                    : hasPage
+                        ? theme.colorScheme.outlineVariant
+                        : theme.colorScheme.outlineVariant
+                            .withValues(alpha: 0.3),
               ),
             );
-          }).toList(),
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCustomView(ThemeData theme) {
+    final range = ref.watch(customRangeProvider);
+    final customAsync = ref.watch(customPeriodProvider);
+    final fmt = DateFormat('MMM d, y');
+
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: _pickCustomRange,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.edit_calendar_outlined, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  range == null
+                      ? 'Tap to pick a date range'
+                      : '${fmt.format(range.start)} – ${fmt.format(range.end)}',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 290,
+          child: customAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+            data: (period) {
+              if (period == null || period.byCategory.isEmpty) {
+                return Center(
+                  child: Text(
+                    range == null
+                        ? 'Pick a date range above'
+                        : 'No payments in this range',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
+                  ),
+                );
+              }
+              return CategoryBreakdownChart(byCategory: period.byCategory);
+            },
+          ),
         ),
       ],
     );
