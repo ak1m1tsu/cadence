@@ -1,0 +1,47 @@
+# ─── Dart / Flutter ───────────────────────────────────────────────────────────
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+**/doc/api/
+
+# Symbolication / obfuscation maps
+app.*.symbols
+app.*.map.json
+
+# ─── Android ──────────────────────────────────────────────────────────────────
+android/.gradle/
+android/build/
+android/local.properties
+android/key.properties
+android/captures/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/gradlew
+android/gradlew.bat
+*.iml
+
+# ─── iOS / macOS ──────────────────────────────────────────────────────────────
+**/ios/Flutter/.last_build_id
+ios/Pods/
+ios/.symlinks/
+macos/Pods/
+macos/.symlinks/
+*.xcworkspace
+**/Podfile.lock
+
+# ─── IDEs ─────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.ipr
+*.iws
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.log
