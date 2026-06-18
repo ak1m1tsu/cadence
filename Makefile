@@ -1,3 +1,4 @@
+SHELL := bash
 .DEFAULT_GOAL := help
 
 .PHONY: help run deps gen icons analyze test build clean release
