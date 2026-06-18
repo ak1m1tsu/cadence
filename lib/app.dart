@@ -10,6 +10,7 @@ import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/settings/screens/settings_screen.dart';
 import 'features/payments/screens/payment_detail_screen.dart';
 import 'features/payments/screens/payment_list_screen.dart';
+import 'features/upcoming/screens/upcoming_screen.dart';
 
 // Shared navigator key — notification handler uses this to push screens.
 final appNavigatorKey = GlobalKey<NavigatorState>();
@@ -33,6 +34,7 @@ class _AppState extends ConsumerState<App> {
 
   static const _screens = [
     PaymentListScreen(),
+    UpcomingScreen(),
     DashboardScreen(),
     SettingsScreen(),
   ];
@@ -89,6 +91,11 @@ class _AppState extends ConsumerState<App> {
               icon: Icon(Icons.credit_card_outlined),
               selectedIcon: Icon(Icons.credit_card),
               label: 'Payments',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.schedule_outlined),
+              selectedIcon: Icon(Icons.schedule),
+              label: 'Upcoming',
             ),
             NavigationDestination(
               icon: Icon(Icons.bar_chart_outlined),

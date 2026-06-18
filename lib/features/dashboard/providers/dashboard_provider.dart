@@ -8,29 +8,9 @@ import '../../../core/services/renewal_calculator.dart';
 import '../../../features/settings/providers/settings_provider.dart';
 import '../../../features/payments/providers/payments_provider.dart';
 
-// ─── Filter state ─────────────────────────────────────────────────────────────
-
-class DashboardFilter {
-  final int upcomingDays;
-  final Set<int> categoryIds; // empty = all categories
-
-  const DashboardFilter({
-    this.upcomingDays = 30,
-    this.categoryIds = const {},
-  });
-
-  DashboardFilter copyWith({int? upcomingDays, Set<int>? categoryIds}) =>
-      DashboardFilter(
-        upcomingDays: upcomingDays ?? this.upcomingDays,
-        categoryIds: categoryIds ?? this.categoryIds,
-      );
-}
-
-final dashboardFilterProvider =
-    StateProvider<DashboardFilter>((ref) => const DashboardFilter());
-
 // ─── Data models ──────────────────────────────────────────────────────────────
 
+// Kept here so upcoming_provider can import it without a circular dependency.
 class UpcomingRenewal {
   final String paymentId;
   final String name;
@@ -83,7 +63,6 @@ class DashboardData {
   final List<PeriodData> monthlyPeriods;
   /// 3 calendar years, index 0 = 2 years ago, index 2 = current year.
   final List<PeriodData> yearlyPeriods;
-  final List<UpcomingRenewal> upcomingRenewals;
 
   const DashboardData({
     required this.monthlyTotal,
@@ -92,7 +71,6 @@ class DashboardData {
     required this.paymentCount,
     required this.monthlyPeriods,
     required this.yearlyPeriods,
-    required this.upcomingRenewals,
   });
 
   static const empty = DashboardData(
@@ -102,75 +80,43 @@ class DashboardData {
     paymentCount: 0,
     monthlyPeriods: [],
     yearlyPeriods: [],
-    upcomingRenewals: [],
   );
 }
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 final dashboardProvider = FutureProvider<DashboardData>((ref) async {
-  final allSubs = ref.watch(paymentsProvider).valueOrNull ?? [];
+  final allPayments = ref.watch(paymentsProvider).valueOrNull ?? [];
   final settings = ref.watch(settingsProvider);
-  final filter = ref.watch(dashboardFilterProvider);
   final currencyService = ref.read(currencyServiceProvider);
 
-  if (allSubs.isEmpty) return DashboardData.empty;
+  if (allPayments.isEmpty) return DashboardData.empty;
 
   final catMappings = await ref
       .read(appDatabaseProvider)
       .paymentCategoriesDao
       .getAllMappings();
 
-  final subs = filter.categoryIds.isEmpty
-      ? allSubs
-      : allSubs.where((s) {
-          final cats = catMappings[s.id] ?? [];
-          return cats.any((c) => filter.categoryIds.contains(c.id));
-        }).toList();
-
   final base = settings.baseCurrency;
   final now = DateTime.now();
 
   double totalMonthly = 0;
-  final upcomingList = <UpcomingRenewal>[];
 
-  for (final sub in subs) {
-    final cycle = BillingCycle.fromDb(sub.billingCycle);
-    final startDate = DateTime.fromMillisecondsSinceEpoch(sub.startDate);
-    final renewalDate =
-        nextRenewalDate(startDate, cycle, periodInterval: sub.periodInterval);
-
+  for (final payment in allPayments) {
+    final cycle = BillingCycle.fromDb(payment.billingCycle);
     final convertedPrice =
-        await currencyService.convert(sub.price, sub.currencyCode, base);
-    final monthly =
-        toMonthlyAmount(convertedPrice, cycle, periodInterval: sub.periodInterval);
-
-    totalMonthly += monthly;
-
-    final cutoff = now.add(Duration(days: filter.upcomingDays));
-    if (!renewalDate.isAfter(cutoff)) {
-      upcomingList.add(UpcomingRenewal(
-        paymentId: sub.id,
-        name: sub.name,
-        renewalDate: renewalDate,
-        price: sub.price,
-        currencyCode: sub.currencyCode,
-        iconType: sub.iconType,
-        iconIdentifier: sub.iconIdentifier,
-        iconColorHex: sub.iconColorHex,
-      ));
-    }
+        await currencyService.convert(payment.price, payment.currencyCode, base);
+    totalMonthly +=
+        toMonthlyAmount(convertedPrice, cycle, periodInterval: payment.periodInterval);
   }
-
-  upcomingList.sort((a, b) => a.renewalDate.compareTo(b.renewalDate));
 
   // 12 calendar months (oldest → newest, index 11 = current month).
   final monthlyPeriods = <PeriodData>[];
   for (var i = 11; i >= 0; i--) {
     final from = DateTime(now.year, now.month - i, 1);
     final to = DateTime(now.year, now.month - i + 1, 1);
-    final byCat =
-        await _buildPeriodSpend(subs, catMappings, from, to, currencyService, base);
+    final byCat = await _buildPeriodSpend(
+        allPayments, catMappings, from, to, currencyService, base);
     monthlyPeriods.add(PeriodData(from: from, to: to, byCategory: byCat));
   }
 
@@ -179,8 +125,8 @@ final dashboardProvider = FutureProvider<DashboardData>((ref) async {
   for (var i = 2; i >= 0; i--) {
     final from = DateTime(now.year - i, 1, 1);
     final to = DateTime(now.year - i + 1, 1, 1);
-    final byCat =
-        await _buildPeriodSpend(subs, catMappings, from, to, currencyService, base);
+    final byCat = await _buildPeriodSpend(
+        allPayments, catMappings, from, to, currencyService, base);
     yearlyPeriods.add(PeriodData(from: from, to: to, byCategory: byCat));
   }
 
@@ -188,10 +134,9 @@ final dashboardProvider = FutureProvider<DashboardData>((ref) async {
     monthlyTotal: totalMonthly,
     yearlyTotal: totalMonthly * 12,
     baseCurrency: base,
-    paymentCount: subs.length,
+    paymentCount: allPayments.length,
     monthlyPeriods: monthlyPeriods,
     yearlyPeriods: yearlyPeriods,
-    upcomingRenewals: upcomingList,
   );
 });
 

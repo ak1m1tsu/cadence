@@ -3,13 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../shared/widgets/empty_state.dart';
-import '../../payments/providers/payments_provider.dart';
-import '../../payments/widgets/icon_picker_dialog.dart';
 import '../providers/dashboard_provider.dart';
 import '../widgets/category_breakdown_chart.dart';
 import '../widgets/spending_summary_card.dart';
-
-const _kUpcomingDayOptions = [7, 14, 30, 90];
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -17,7 +13,6 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashAsync = ref.watch(dashboardProvider);
-    final filter = ref.watch(dashboardFilterProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -30,150 +25,41 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _FilterBar(filter: filter, ref: ref),
-          Expanded(
-            child: dashAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
-              data: (data) {
-                if (data.paymentCount == 0) {
-                  return const EmptyState(
-                    icon: Icons.bar_chart_outlined,
-                    title: 'No data yet',
-                    subtitle: 'Add payments to see your spending summary.',
-                  );
-                }
-                return RefreshIndicator(
-                  onRefresh: () => ref.refresh(dashboardProvider.future),
-                  child: ListView(
-                    children: [
-                      SpendingSummaryCard(
-                        monthlyTotal: data.monthlyTotal,
-                        yearlyTotal: data.yearlyTotal,
-                        currency: data.baseCurrency,
-                      ),
-                      _StatsGrid(data: data),
-                      const SizedBox(height: 8),
-                      if (data.monthlyPeriods.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: _PeriodCarousel(
-                            monthlyPeriods: data.monthlyPeriods,
-                            yearlyPeriods: data.yearlyPeriods,
-                          ),
-                        ),
-                      const SizedBox(height: 8),
-                      if (data.upcomingRenewals.isNotEmpty)
-                        _UpcomingRenewals(
-                          renewals: data.upcomingRenewals,
-                          days: filter.upcomingDays,
-                        ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Filter bar ───────────────────────────────────────────────────────────────
-
-class _FilterBar extends ConsumerWidget {
-  final DashboardFilter filter;
-  final WidgetRef ref;
-
-  const _FilterBar({required this.filter, required this.ref});
-
-  @override
-  Widget build(BuildContext context, WidgetRef widgetRef) {
-    final theme = Theme.of(context);
-    final categories = widgetRef.watch(categoriesProvider).valueOrNull ?? [];
-
-    return Container(
-      color: theme.colorScheme.surface,
-      child: Column(
-        children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-            child: Row(
+      body: dashAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (data) {
+          if (data.paymentCount == 0) {
+            return const EmptyState(
+              icon: Icons.bar_chart_outlined,
+              title: 'No data yet',
+              subtitle: 'Add payments to see your spending summary.',
+            );
+          }
+          return RefreshIndicator(
+            onRefresh: () => ref.refresh(dashboardProvider.future),
+            child: ListView(
               children: [
-                Text('Upcoming:',
-                    style: theme.textTheme.labelMedium
-                        ?.copyWith(color: theme.colorScheme.outline)),
-                const SizedBox(width: 8),
-                ..._kUpcomingDayOptions.map((d) {
-                  final selected = filter.upcomingDays == d;
-                  final label = d == 7
-                      ? '7 days'
-                      : d == 14
-                          ? '14 days'
-                          : d == 30
-                              ? '30 days'
-                              : '90 days';
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      label: Text(label),
-                      selected: selected,
-                      onSelected: (_) => ref
-                          .read(dashboardFilterProvider.notifier)
-                          .update((f) => f.copyWith(upcomingDays: d)),
+                SpendingSummaryCard(
+                  monthlyTotal: data.monthlyTotal,
+                  yearlyTotal: data.yearlyTotal,
+                  currency: data.baseCurrency,
+                ),
+                _StatsGrid(data: data),
+                const SizedBox(height: 8),
+                if (data.monthlyPeriods.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: _PeriodCarousel(
+                      monthlyPeriods: data.monthlyPeriods,
+                      yearlyPeriods: data.yearlyPeriods,
                     ),
-                  );
-                }),
+                  ),
+                const SizedBox(height: 24),
               ],
             ),
-          ),
-          if (categories.isNotEmpty)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
-              child: Row(
-                children: [
-                  Text('Categories:',
-                      style: theme.textTheme.labelMedium
-                          ?.copyWith(color: theme.colorScheme.outline)),
-                  const SizedBox(width: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      label: const Text('All'),
-                      selected: filter.categoryIds.isEmpty,
-                      onSelected: (_) => ref
-                          .read(dashboardFilterProvider.notifier)
-                          .update((f) => f.copyWith(categoryIds: {})),
-                    ),
-                  ),
-                  ...categories.map((cat) {
-                    final selected = filter.categoryIds.contains(cat.id);
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: FilterChip(
-                        label: Text(cat.name),
-                        selected: selected,
-                        onSelected: (v) {
-                          final ids = Set<int>.from(filter.categoryIds);
-                          if (v) { ids.add(cat.id); } else { ids.remove(cat.id); }
-                          ref
-                              .read(dashboardFilterProvider.notifier)
-                              .update((f) => f.copyWith(categoryIds: ids));
-                        },
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-          const Divider(height: 1),
-        ],
+          );
+        },
       ),
     );
   }
@@ -195,7 +81,6 @@ class _StatsGrid extends StatelessWidget {
     final stats = [
       ('Active', '${data.paymentCount}', Icons.credit_card),
       ('Categories', '$catCount', Icons.category_outlined),
-      ('Upcoming', '${data.upcomingRenewals.length}', Icons.schedule),
     ];
 
     return Padding(
@@ -418,68 +303,6 @@ class _PeriodCarouselState extends State<_PeriodCarousel> {
             );
           }).toList(),
         ),
-      ],
-    );
-  }
-}
-
-// ─── Upcoming renewals ────────────────────────────────────────────────────────
-
-class _UpcomingRenewals extends StatelessWidget {
-  final List<UpcomingRenewal> renewals;
-  final int days;
-
-  const _UpcomingRenewals({required this.renewals, required this.days});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Text(
-            'Upcoming Renewals ($days days)',
-            style: theme.textTheme.titleMedium,
-          ),
-        ),
-        ...renewals.map((r) {
-          final daysUntil = r.renewalDate.difference(DateTime.now()).inDays;
-          final isUrgent = daysUntil <= 3;
-          return ListTile(
-            leading: buildPaymentIcon(
-              r.iconType,
-              r.iconIdentifier,
-              r.iconColorHex,
-              r.name,
-              size: 40,
-            ),
-            title: Text(r.name),
-            subtitle: Text(DateFormat('MMM d, y').format(r.renewalDate)),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${r.currencyCode} ${r.price.toStringAsFixed(2)}',
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  daysUntil == 0
-                      ? 'Today'
-                      : daysUntil == 1
-                          ? 'Tomorrow'
-                          : 'In $daysUntil days',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: isUrgent ? theme.colorScheme.error : null,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }),
       ],
     );
   }
