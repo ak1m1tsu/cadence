@@ -53,65 +53,9 @@ jobs:
           name: android-aab
           path: build/app/outputs/bundle/release/app-release.aab
 
-  build-windows:
-    name: Build Windows
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Build Windows
-        run: flutter build windows --release
-
-      - name: Create ZIP
-        run: Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "cadence-windows.zip"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-zip
-          path: cadence-windows.zip
-
-  build-macos:
-    name: Build macOS
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Build macOS
-        run: flutter build macos --release
-        env:
-          CODE_SIGN_IDENTITY: ''
-          CODE_SIGNING_REQUIRED: 'NO'
-          CODE_SIGNING_ALLOWED: 'NO'
-
-      - name: Create ZIP
-        run: |
-          cd build/macos/Build/Products/Release
-          zip -r "$GITHUB_WORKSPACE/cadence-macos.zip" tracer.app
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-zip
-          path: cadence-macos.zip
-
   release:
     name: Create Release
-    needs: [build-android, build-windows, build-macos]
+    needs: build-android
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -125,8 +69,6 @@ jobs:
           TAG=${{ github.ref_name }}
           cp artifacts/android-apk/app-release.apk cadence-${TAG}.apk
           cp artifacts/android-aab/app-release.aab cadence-${TAG}.aab
-          cp artifacts/windows-zip/cadence-windows.zip cadence-${TAG}-windows.zip
-          cp artifacts/macos-zip/cadence-macos.zip cadence-${TAG}-macos.zip
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -134,5 +76,3 @@ jobs:
           files: |
             cadence-${{ github.ref_name }}.apk
             cadence-${{ github.ref_name }}.aab
-            cadence-${{ github.ref_name }}-windows.zip
-            cadence-${{ github.ref_name }}-macos.zip

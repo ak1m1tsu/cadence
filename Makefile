@@ -1,7 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help run deps gen icons analyze test \
-        build-android build-windows build-macos clean release
+.PHONY: help run deps gen icons analyze test build clean release
 
 help:
 	@echo "Usage: make <target>"
@@ -18,9 +17,7 @@ help:
 	@echo "  test           Run tests"
 	@echo ""
 	@echo "Build:"
-	@echo "  build-android  APK + AAB (release)"
-	@echo "  build-windows  Windows executable (release)"
-	@echo "  build-macos    macOS app bundle (release)"
+	@echo "  build          APK + AAB (release)"
 	@echo ""
 	@echo "Release:"
 	@echo "  release v=1.2.3  Tag and push — triggers CI/CD"
@@ -43,15 +40,9 @@ analyze:
 test:
 	flutter test
 
-build-android:
+build:
 	flutter build apk --release
 	flutter build appbundle --release
-
-build-windows:
-	flutter build windows --release
-
-build-macos:
-	flutter build macos --release
 
 clean:
 	flutter clean

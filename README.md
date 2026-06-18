@@ -13,13 +13,9 @@ A Flutter app for tracking recurring payments and subscriptions. Know what renew
 - **Icon picker** — emoji or letter avatar with custom color per payment
 - **Themes** — light, dark, and system
 
-## Platforms
+## Platform
 
-| Platform | Status |
-|----------|--------|
-| Android  | ✓      |
-| macOS    | ✓      |
-| Windows  | ✓ (notifications not supported) |
+Android only.
 
 ## Tech Stack
 
@@ -35,26 +31,39 @@ A Flutter app for tracking recurring payments and subscriptions. Know what renew
 ## Getting Started
 
 ```bash
-# Install dependencies
-flutter pub get
-
-# Run on a connected device
-flutter run
-
-# Build for production
-flutter build apk          # Android APK
-flutter build appbundle    # Android App Bundle
-flutter build macos
-flutter build windows
+make deps    # install dependencies
+make run     # run on connected device
+make build   # APK + AAB (release)
 ```
 
-## Code Generation
-
-Drift requires generated code. Run after any schema change:
+Or directly with Flutter:
 
 ```bash
-dart run build_runner build --delete-conflicting-outputs
+flutter pub get
+flutter run
+flutter build apk --release
+flutter build appbundle --release
 ```
+
+## Development
+
+```bash
+make gen      # re-run Drift code generation after schema changes
+make analyze  # static analysis
+make test     # run tests
+make icons    # regenerate launcher icons from assets/icon.png
+make clean    # clean build artifacts
+```
+
+## Release
+
+Releases are automated via GitHub Actions. Push a version tag to build and publish APK + AAB to GitHub Releases:
+
+```bash
+make release v=1.2.3
+```
+
+Android signing is configured via repository secrets (`KEYSTORE_BASE64`, `KEYSTORE_STORE_PASSWORD`, `KEYSTORE_KEY_PASSWORD`, `KEYSTORE_KEY_ALIAS`).
 
 ## Project Structure
 
@@ -63,7 +72,7 @@ lib/
 ├── main.dart                    # Entry point
 ├── app.dart                     # Root widget, bottom nav
 ├── core/
-│   ├── database/                # Drift schema (v5), DAOs, migrations
+│   ├── database/                # Drift schema, DAOs, migrations
 │   ├── models/                  # AppSettings, BillingCycle
 │   ├── services/                # Notifications, currency rates, renewal calculator
 │   └── theme/                   # Light/dark themes
@@ -76,12 +85,4 @@ lib/
 
 ## Database
 
-SQLite via Drift, schema version 5. Tables: `payments`, `categories`, `payment_categories`, `currency_rates_cache`. Default categories (Streaming, Software, Utilities, Gaming, Health, News, Finance, Other) are seeded on first launch.
-
-## App Icon
-
-Source image: `assets/icon.png`. Regenerate platform icons after replacing it:
-
-```bash
-dart run flutter_launcher_icons
-```
+SQLite via Drift. Tables: `payments`, `categories`, `payment_categories`, `currency_rates_cache`. Default categories (Streaming, Software, Utilities, Gaming, Health, News, Finance, Other) are seeded on first launch.
