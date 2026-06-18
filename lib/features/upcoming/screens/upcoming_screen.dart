@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -8,8 +9,6 @@ import '../../payments/providers/payments_provider.dart';
 import '../../payments/screens/payment_detail_screen.dart';
 import '../../payments/widgets/icon_picker_dialog.dart';
 import '../providers/upcoming_provider.dart';
-
-const _kDayOptions = [7, 14, 30, 90];
 
 class UpcomingScreen extends ConsumerWidget {
   const UpcomingScreen({super.key});
@@ -21,132 +20,273 @@ class UpcomingScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Upcoming'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Upcoming'),
+            Text(
+              filter.summary +
+                  (filter.categoryIds.isNotEmpty
+                      ? ' · ${filter.categoryIds.length} categor${filter.categoryIds.length == 1 ? 'y' : 'ies'}'
+                      : ''),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+          ],
+        ),
         centerTitle: false,
-      ),
-      body: Column(
-        children: [
-          _FilterBar(filter: filter),
-          Expanded(
-            child: upcomingAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
-              data: (renewals) {
-                if (renewals.isEmpty) {
-                  return const EmptyState(
-                    icon: Icons.event_available_outlined,
-                    title: 'No upcoming renewals',
-                    subtitle: 'Nothing renews in the selected period.',
-                  );
-                }
-                return ListView.builder(
-                  itemCount: renewals.length,
-                  itemBuilder: (context, i) =>
-                      _RenewalTile(renewal: renewals[i]),
-                );
-              },
+        actions: [
+          Badge(
+            isLabelVisible: !filter.isDefault,
+            child: IconButton(
+              icon: const Icon(Icons.tune),
+              tooltip: 'Filter',
+              onPressed: () => _showFilterModal(context, ref, filter),
             ),
           ),
+          const SizedBox(width: 4),
         ],
+      ),
+      body: upcomingAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (renewals) {
+          if (renewals.isEmpty) {
+            return const EmptyState(
+              icon: Icons.event_available_outlined,
+              title: 'No upcoming renewals',
+              subtitle: 'Nothing renews in the selected period.',
+            );
+          }
+          return ListView.builder(
+            itemCount: renewals.length,
+            itemBuilder: (context, i) => _RenewalTile(renewal: renewals[i]),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showFilterModal(
+      BuildContext context, WidgetRef ref, UpcomingFilter current) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _FilterModal(
+        current: current,
+        onApply: (f) =>
+            ref.read(upcomingFilterProvider.notifier).state = f,
       ),
     );
   }
 }
 
-// ─── Filter bar ───────────────────────────────────────────────────────────────
+// ─── Filter modal ─────────────────────────────────────────────────────────────
 
-class _FilterBar extends ConsumerWidget {
-  final UpcomingFilter filter;
+class _FilterModal extends ConsumerStatefulWidget {
+  final UpcomingFilter current;
+  final ValueChanged<UpcomingFilter> onApply;
 
-  const _FilterBar({required this.filter});
+  const _FilterModal({required this.current, required this.onApply});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_FilterModal> createState() => _FilterModalState();
+}
+
+class _FilterModalState extends ConsumerState<_FilterModal> {
+  late final TextEditingController _countCtrl;
+  late PeriodUnit _unit;
+  late Set<int> _categoryIds;
+
+  @override
+  void initState() {
+    super.initState();
+    _countCtrl = TextEditingController(
+        text: widget.current.periodCount.toString());
+    _unit = widget.current.periodUnit;
+    _categoryIds = Set.from(widget.current.categoryIds);
+  }
+
+  @override
+  void dispose() {
+    _countCtrl.dispose();
+    super.dispose();
+  }
+
+  int get _count => int.tryParse(_countCtrl.text) ?? 1;
+
+  void _apply() {
+    final count = _count.clamp(1, 999);
+    widget.onApply(UpcomingFilter(
+      periodCount: count,
+      periodUnit: _unit,
+      categoryIds: Set.from(_categoryIds),
+    ));
+    Navigator.pop(context);
+  }
+
+  void _reset() {
+    widget.onApply(const UpcomingFilter());
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final categories = ref.watch(categoriesProvider).valueOrNull ?? [];
 
-    return Container(
-      color: theme.colorScheme.surface,
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          // Handle + header
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Row(
               children: [
-                Text('Period:',
-                    style: theme.textTheme.labelMedium
-                        ?.copyWith(color: theme.colorScheme.outline)),
-                const SizedBox(width: 8),
-                ..._kDayOptions.map((d) {
-                  final selected = filter.days == d;
-                  final label = d == 7
-                      ? '7 days'
-                      : d == 14
-                          ? '14 days'
-                          : d == 30
-                              ? '30 days'
-                              : '90 days';
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      label: Text(label),
-                      selected: selected,
-                      onSelected: (_) => ref
-                          .read(upcomingFilterProvider.notifier)
-                          .update((f) => f.copyWith(days: d)),
-                    ),
-                  );
-                }),
+                Text('Filter', style: theme.textTheme.titleMedium),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
               ],
             ),
           ),
-          if (categories.isNotEmpty)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
-              child: Row(
-                children: [
-                  Text('Category:',
-                      style: theme.textTheme.labelMedium
-                          ?.copyWith(color: theme.colorScheme.outline)),
-                  const SizedBox(width: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      label: const Text('All'),
-                      selected: filter.categoryIds.isEmpty,
-                      onSelected: (_) => ref
-                          .read(upcomingFilterProvider.notifier)
-                          .update((f) => f.copyWith(categoryIds: {})),
+          const Divider(height: 1),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Period',
+                    style: theme.textTheme.labelMedium
+                        ?.copyWith(color: theme.colorScheme.outline)),
+                const SizedBox(height: 10),
+
+                // Count + unit row
+                Row(
+                  children: [
+                    SizedBox(
+                      width: 80,
+                      child: TextFormField(
+                        controller: _countCtrl,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
                     ),
-                  ),
-                  ...categories.map((cat) {
-                    final selected = filter.categoryIds.contains(cat.id);
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: FilterChip(
-                        label: Text(cat.name),
-                        selected: selected,
-                        onSelected: (v) {
-                          final ids = Set<int>.from(filter.categoryIds);
-                          if (v) {
-                            ids.add(cat.id);
-                          } else {
-                            ids.remove(cat.id);
-                          }
-                          ref
-                              .read(upcomingFilterProvider.notifier)
-                              .update((f) => f.copyWith(categoryIds: ids));
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<PeriodUnit>(
+                        // ignore: deprecated_member_use
+                        value: _unit,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                        items: PeriodUnit.values
+                            .map((u) => DropdownMenuItem(
+                                  value: u,
+                                  child: Text(u.label),
+                                ))
+                            .toList(),
+                        onChanged: (v) {
+                          if (v != null) setState(() => _unit = v);
                         },
                       ),
-                    );
-                  }),
+                    ),
+                  ],
+                ),
+
+                if (categories.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Text('Categories',
+                      style: theme.textTheme.labelMedium
+                          ?.copyWith(color: theme.colorScheme.outline)),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      FilterChip(
+                        label: const Text('All'),
+                        selected: _categoryIds.isEmpty,
+                        onSelected: (_) =>
+                            setState(() => _categoryIds.clear()),
+                      ),
+                      ...categories.map((cat) {
+                        final selected = _categoryIds.contains(cat.id);
+                        return FilterChip(
+                          label: Text(cat.name),
+                          selected: selected,
+                          onSelected: (v) => setState(() {
+                            if (v) {
+                              _categoryIds.add(cat.id);
+                            } else {
+                              _categoryIds.remove(cat.id);
+                            }
+                          }),
+                        );
+                      }),
+                    ],
+                  ),
                 ],
-              ),
+
+                const SizedBox(height: 24),
+
+                // Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _reset,
+                        child: const Text('Reset'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _apply,
+                        child: const Text('Apply'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+              ],
             ),
-          const Divider(height: 1),
+          ),
         ],
       ),
     );

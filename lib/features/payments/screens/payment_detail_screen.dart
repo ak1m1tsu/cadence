@@ -124,23 +124,6 @@ class _DetailView extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(payment.name),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    PaymentFormScreen(payment: payment),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: Icon(Icons.delete_outline,
-                color: theme.colorScheme.error),
-            onPressed: onDelete,
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -322,9 +305,41 @@ class _DetailView extends StatelessWidget {
               ),
             ],
 
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onDelete,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: theme.colorScheme.error,
+                      side: BorderSide(color: theme.colorScheme.error),
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                    child: const Text('Delete'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PaymentFormScreen(payment: payment),
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                    child: const Text('Edit'),
+                  ),
+                ),
+              ],
+            ),
+
             // Test button — debug builds only, requires developer mode toggle
             if (kDebugMode && developerMode) ...[
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               _TestReminderButton(
                 payment: payment,
                 renewalDate: renewalDate,

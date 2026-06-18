@@ -151,12 +151,6 @@ class _PaymentFormScreenState
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Payment' : 'Add Payment'),
-        actions: [
-          TextButton(
-            onPressed: _isSubmitting ? null : _submit,
-            child: const Text('Save'),
-          ),
-        ],
       ),
       body: Form(
         key: _formKey,

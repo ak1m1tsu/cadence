@@ -12,13 +12,11 @@ import 'icon_picker_dialog.dart';
 class PaymentCard extends ConsumerWidget {
   final Payment payment;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
 
   const PaymentCard({
     super.key,
     required this.payment,
     required this.onTap,
-    required this.onDelete,
   });
 
   @override
@@ -126,11 +124,6 @@ class PaymentCard extends ConsumerWidget {
                     ],
                   ],
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: onDelete,
-                color: theme.colorScheme.error,
               ),
             ],
           ),

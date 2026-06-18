@@ -152,8 +152,20 @@ Future<Map<String, CategorySpend>> _buildPeriodSpend(
   for (final payment in payments) {
     final cycle = BillingCycle.fromDb(payment.billingCycle);
     final startDate = DateTime.fromMillisecondsSinceEpoch(payment.startDate);
-    var d = nextRenewalDate(startDate, cycle, periodInterval: payment.periodInterval);
 
+    // Walk forward from the first renewal after startDate.
+    // nextRenewalDate returns a future date, so we instead advance manually
+    // from startDate to correctly find renewals in any historical period.
+    var d = advanceByCycle(startDate, cycle, payment.periodInterval);
+
+    // Fast-forward to the period window.
+    while (d.isBefore(from)) {
+      final next = advanceByCycle(d, cycle, payment.periodInterval);
+      if (!next.isAfter(d)) break;
+      d = next;
+    }
+
+    // Count every renewal that falls within [from, to).
     while (d.isBefore(to)) {
       if (!d.isBefore(from)) {
         final converted =

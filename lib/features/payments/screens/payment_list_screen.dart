@@ -4,9 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../app.dart';
 import '../../../core/database/app_database.dart';
-import '../../../core/database/database_provider.dart';
 import '../../../core/models/billing_cycle.dart';
-import '../../../core/services/notification_service.dart';
 import '../../../core/services/renewal_calculator.dart';
 import '../../../shared/widgets/color_letter_avatar.dart';
 import '../../../shared/widgets/empty_state.dart';
@@ -38,10 +36,9 @@ class PaymentListScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: () => _openForm(context),
-        icon: const Icon(Icons.add),
-        label: const Text('Add'),
+        child: const Icon(Icons.add),
       ),
       body: paymentsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -65,8 +62,6 @@ class PaymentListScreen extends ConsumerWidget {
                 ? _GridView(
                     payments: payments,
                     onTap: (p) => _openDetail(context, p.id),
-                    onDelete: (p) =>
-                        _confirmDelete(context, ref, p.id, p.name),
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.only(bottom: 96),
@@ -76,8 +71,6 @@ class PaymentListScreen extends ConsumerWidget {
                       return PaymentCard(
                         payment: payment,
                         onTap: () => _openDetail(context, payment.id),
-                        onDelete: () =>
-                            _confirmDelete(context, ref, payment.id, payment.name),
                       );
                     },
                   ),
@@ -102,37 +95,6 @@ class PaymentListScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmDelete(
-    BuildContext context,
-    WidgetRef ref,
-    String id,
-    String name,
-  ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Payment'),
-        content: Text('Remove "$name"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      await ref.read(appDatabaseProvider).paymentsDao.softDelete(id);
-      await NotificationService.cancelReminder(id);
-    }
-  }
 }
 
 // ─── Grid view ────────────────────────────────────────────────────────────────
@@ -140,12 +102,10 @@ class PaymentListScreen extends ConsumerWidget {
 class _GridView extends ConsumerWidget {
   final List<Payment> payments;
   final void Function(Payment) onTap;
-  final void Function(Payment) onDelete;
 
   const _GridView({
     required this.payments,
     required this.onTap,
-    required this.onDelete,
   });
 
   @override
@@ -163,7 +123,6 @@ class _GridView extends ConsumerWidget {
         return _GridCard(
           payment: payments[i],
           onTap: () => onTap(payments[i]),
-          onDelete: () => onDelete(payments[i]),
         );
       },
     );
@@ -173,12 +132,10 @@ class _GridView extends ConsumerWidget {
 class _GridCard extends ConsumerWidget {
   final Payment payment;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
 
   const _GridCard({
     required this.payment,
     required this.onTap,
-    required this.onDelete,
   });
 
   @override
@@ -205,9 +162,7 @@ class _GridCard extends ConsumerWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Stack(
-          children: [
-            Padding(
+        child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -299,21 +254,6 @@ class _GridCard extends ConsumerWidget {
                 ],
               ),
             ),
-
-            // Delete button (top-right)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: IconButton(
-                icon: Icon(Icons.close, size: 16,
-                    color: theme.colorScheme.outline),
-                padding: const EdgeInsets.all(6),
-                constraints: const BoxConstraints(),
-                onPressed: onDelete,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -6,17 +6,57 @@ import '../../../core/services/renewal_calculator.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 import '../../payments/providers/payments_provider.dart';
 
+enum PeriodUnit { day, week, month, year }
+
+extension PeriodUnitX on PeriodUnit {
+  int get daysMultiplier => switch (this) {
+        PeriodUnit.day => 1,
+        PeriodUnit.week => 7,
+        PeriodUnit.month => 30,
+        PeriodUnit.year => 365,
+      };
+
+  String get label => switch (this) {
+        PeriodUnit.day => 'Day',
+        PeriodUnit.week => 'Week',
+        PeriodUnit.month => 'Month',
+        PeriodUnit.year => 'Year',
+      };
+}
+
 class UpcomingFilter {
-  final int days;
+  final int periodCount;
+  final PeriodUnit periodUnit;
   final Set<int> categoryIds;
 
   const UpcomingFilter({
-    this.days = 30,
+    this.periodCount = 1,
+    this.periodUnit = PeriodUnit.month,
     this.categoryIds = const {},
   });
 
-  UpcomingFilter copyWith({int? days, Set<int>? categoryIds}) => UpcomingFilter(
-        days: days ?? this.days,
+  int get totalDays => periodCount * periodUnit.daysMultiplier;
+
+  String get summary {
+    final unit = periodCount == 1
+        ? periodUnit.label
+        : '${periodUnit.label}s';
+    return 'Next $periodCount $unit';
+  }
+
+  bool get isDefault =>
+      periodCount == 1 &&
+      periodUnit == PeriodUnit.month &&
+      categoryIds.isEmpty;
+
+  UpcomingFilter copyWith({
+    int? periodCount,
+    PeriodUnit? periodUnit,
+    Set<int>? categoryIds,
+  }) =>
+      UpcomingFilter(
+        periodCount: periodCount ?? this.periodCount,
+        periodUnit: periodUnit ?? this.periodUnit,
         categoryIds: categoryIds ?? this.categoryIds,
       );
 }
@@ -43,7 +83,7 @@ final upcomingProvider = FutureProvider<List<UpcomingRenewal>>((ref) async {
         }).toList();
 
   final now = DateTime.now();
-  final cutoff = now.add(Duration(days: filter.days));
+  final cutoff = now.add(Duration(days: filter.totalDays));
   final list = <UpcomingRenewal>[];
 
   for (final payment in payments) {

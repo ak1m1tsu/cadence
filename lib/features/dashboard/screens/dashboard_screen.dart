@@ -18,28 +18,22 @@ class DashboardScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Dashboard'),
         centerTitle: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(dashboardProvider),
-          ),
-        ],
       ),
       body: dashAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (data) {
-          if (data.paymentCount == 0) {
-            return const EmptyState(
-              icon: Icons.bar_chart_outlined,
-              title: 'No data yet',
-              subtitle: 'Add payments to see your spending summary.',
-            );
-          }
           return RefreshIndicator(
             onRefresh: () => ref.refresh(dashboardProvider.future),
             child: ListView(
               children: [
+                if (data.paymentCount == 0)
+                  const EmptyState(
+                    icon: Icons.bar_chart_outlined,
+                    title: 'No data yet',
+                    subtitle: 'Add payments to see your spending summary.',
+                  ),
+                if (data.paymentCount > 0) ...[
                 SpendingSummaryCard(
                   monthlyTotal: data.monthlyTotal,
                   yearlyTotal: data.yearlyTotal,
@@ -56,6 +50,7 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   ),
                 const SizedBox(height: 24),
+                ],
               ],
             ),
           );

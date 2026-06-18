@@ -115,8 +115,7 @@ class NotificationService {
     final tzDate = tz.TZDateTime.from(notifDate, tz.local);
 
     final dateStr = DateFormat('MMM d, y').format(renewalDate);
-    final priceStr =
-        '${price % 1 == 0 ? price.toStringAsFixed(0) : price.toStringAsFixed(2)} $currencyCode';
+    final priceStr = _formatPrice(price, currencyCode);
 
     await _plugin.zonedSchedule(
       id,
@@ -156,8 +155,7 @@ class NotificationService {
     if (!_supported) return false;
 
     final dateStr = DateFormat('MMM d, y').format(renewalDate);
-    final priceStr =
-        '${price % 1 == 0 ? price.toStringAsFixed(0) : price.toStringAsFixed(2)} $currencyCode';
+    final priceStr = _formatPrice(price, currencyCode);
 
     await _plugin.show(
       (paymentId.hashCode.abs() % 100000) + 1,
@@ -200,6 +198,9 @@ class NotificationService {
       );
     }
   }
+
+  static String _formatPrice(double price, String currencyCode) =>
+      NumberFormat.simpleCurrency(name: currencyCode).format(price);
 }
 
 // Top-level function — required by flutter_local_notifications for background
