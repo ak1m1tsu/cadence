@@ -201,7 +201,7 @@ class SettingsScreen extends ConsumerWidget {
                   _CustomListTile(
                     icon: CupertinoIcons.info_circle,
                     title: 'Cadence',
-                    subtitle: 'Version 1.0.0',
+                    subtitle: 'Version ${const String.fromEnvironment('APP_VERSION', defaultValue: 'dev')}',
                     trailing: const SizedBox(),
                     onTap: null,
                   ),
@@ -241,8 +241,7 @@ class _SingleSection extends StatelessWidget {
             ),
           ),
         ),
-        Container(
-          width: double.infinity,
+        Material(
           color: theme.colorScheme.primary.withValues(alpha: 0.04),
           child: Column(children: children),
         ),

@@ -24,7 +24,7 @@ help:
 	@echo "  release v=1.2.3  Tag and push — triggers CI/CD"
 
 run:
-	flutter run
+	flutter run --dart-define=APP_VERSION=$$(grep '^version:' pubspec.yaml | sed 's/^version: //; s/+.*//')-dev-$$(git rev-parse --short HEAD)
 
 deps:
 	flutter pub get
