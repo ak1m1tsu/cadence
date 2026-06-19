@@ -34,6 +34,8 @@ class Payments extends Table {
   IntColumn get reminderLeadDays => integer().nullable()();
   IntColumn get reminderHour => integer().nullable()();
   IntColumn get reminderMinute => integer().nullable()();
+  IntColumn get trialPeriodInterval => integer().nullable()();
+  TextColumn get trialPeriodUnit => text().nullable()();
   IntColumn get createdAt => integer()();
   IntColumn get updatedAt => integer()();
 
@@ -73,7 +75,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.inMemory() : super(NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -134,6 +136,14 @@ class AppDatabase extends _$AppDatabase {
             );
             await customStatement(
               'ALTER TABLE payment_categories RENAME COLUMN subscription_id TO payment_id',
+            );
+          }
+          if (from < 6) {
+            await customStatement(
+              'ALTER TABLE payments ADD COLUMN trial_period_interval INTEGER',
+            );
+            await customStatement(
+              'ALTER TABLE payments ADD COLUMN trial_period_unit TEXT',
             );
           }
         },

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/database_provider.dart';
 import '../../../core/models/billing_cycle.dart';
+import '../../../core/models/trial_unit.dart';
 import '../../../core/services/renewal_calculator.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 import '../../payments/providers/payments_provider.dart';
@@ -89,8 +90,16 @@ final upcomingProvider = FutureProvider<List<UpcomingRenewal>>((ref) async {
   for (final payment in payments) {
     final cycle = BillingCycle.fromDb(payment.billingCycle);
     final startDate = DateTime.fromMillisecondsSinceEpoch(payment.startDate);
-    final renewalDate =
-        nextRenewalDate(startDate, cycle, periodInterval: payment.periodInterval);
+    final trialUnit = payment.trialPeriodUnit != null
+        ? TrialUnit.values.byName(payment.trialPeriodUnit!)
+        : null;
+    final renewalDate = nextRenewalDate(
+      startDate,
+      cycle,
+      periodInterval: payment.periodInterval,
+      trialPeriodInterval: payment.trialPeriodInterval,
+      trialPeriodUnit: trialUnit,
+    );
     if (!renewalDate.isAfter(cutoff)) {
       list.add(UpcomingRenewal(
         paymentId: payment.id,

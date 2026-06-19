@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/database_provider.dart';
 import '../../../core/models/billing_cycle.dart';
+import '../../../core/models/trial_unit.dart';
 import '../../../core/services/currency_service.dart';
 import '../../../core/services/renewal_calculator.dart';
 import '../../../features/settings/providers/settings_provider.dart';
@@ -224,8 +225,20 @@ Future<Map<String, CategorySpend>> _buildPeriodSpend(
   for (final payment in payments) {
     final cycle = BillingCycle.fromDb(payment.billingCycle);
     final startDate = DateTime.fromMillisecondsSinceEpoch(payment.startDate);
+    final trialInterval = payment.trialPeriodInterval;
+    final trialUnit = payment.trialPeriodUnit != null
+        ? TrialUnit.values.byName(payment.trialPeriodUnit!)
+        : null;
+    final hasTrial =
+        trialInterval != null && trialUnit != null && trialInterval > 0;
+    final billingStart = hasTrial
+        ? startDate
+            .add(Duration(days: trialTotalDays(trialInterval, trialUnit)))
+        : startDate;
 
-    var d = advanceByCycle(startDate, cycle, payment.periodInterval);
+    var d = hasTrial
+        ? billingStart
+        : advanceByCycle(startDate, cycle, payment.periodInterval);
 
     while (d.isBefore(from)) {
       final next = advanceByCycle(d, cycle, payment.periodInterval);

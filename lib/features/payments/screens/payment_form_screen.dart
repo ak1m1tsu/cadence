@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/database_provider.dart';
 import '../../../core/models/billing_cycle.dart';
+import '../../../core/models/trial_unit.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/renewal_calculator.dart';
 import '../../../shared/widgets/color_letter_avatar.dart';
@@ -16,6 +17,7 @@ import '../../settings/widgets/currency_picker.dart';
 import '../providers/payments_provider.dart';
 import '../widgets/billing_cycle_selector.dart';
 import '../widgets/icon_picker_dialog.dart';
+import '../widgets/trial_period_selector.dart';
 
 // null = no reminder
 const _kReminderOptions = <int?, String>{
@@ -56,6 +58,9 @@ class _PaymentFormScreenState
   late String _iconColorHex;
   late int? _reminderLeadDays;
   late TimeOfDay _reminderTime;
+  bool _trialEnabled = false;
+  late final TextEditingController _trialIntervalCtrl;
+  TrialUnit _trialUnit = TrialUnit.days;
   bool _isSubmitting = false;
   bool _currencyInitialized = false;
 
@@ -106,6 +111,13 @@ class _PaymentFormScreenState
       hour: p?.reminderHour ?? 9,
       minute: p?.reminderMinute ?? 0,
     );
+    _trialEnabled = p?.trialPeriodInterval != null;
+    _trialIntervalCtrl = TextEditingController(
+      text: (p?.trialPeriodInterval ?? 1).toString(),
+    );
+    _trialUnit = p?.trialPeriodUnit != null
+        ? TrialUnit.values.byName(p!.trialPeriodUnit!)
+        : TrialUnit.days;
   }
 
   @override
@@ -140,6 +152,7 @@ class _PaymentFormScreenState
     _priceCtrl.dispose();
     _notesCtrl.dispose();
     _intervalCtrl.dispose();
+    _trialIntervalCtrl.dispose();
     super.dispose();
   }
 
@@ -254,6 +267,21 @@ class _PaymentFormScreenState
               onTap: _pickDate,
             ),
             const Divider(),
+            const SizedBox(height: 8),
+
+            // Trial period
+            TrialPeriodSelector(
+              enabled: _trialEnabled,
+              intervalController: _trialIntervalCtrl,
+              unit: _trialUnit,
+              onEnabledChanged: (v) => setState(() {
+                _trialEnabled = v;
+                if (v && _trialIntervalCtrl.text.isEmpty) {
+                  _trialIntervalCtrl.text = '1';
+                }
+              }),
+              onUnitChanged: (u) => setState(() => _trialUnit = u),
+            ),
             const SizedBox(height: 8),
 
             // Categories (multi-select chips)
@@ -433,6 +461,9 @@ class _PaymentFormScreenState
         reminderHour: Value(_reminderLeadDays != null ? _reminderTime.hour : null),
         reminderMinute:
             Value(_reminderLeadDays != null ? _reminderTime.minute : null),
+        trialPeriodInterval:
+            Value(_trialEnabled ? int.parse(_trialIntervalCtrl.text) : null),
+        trialPeriodUnit: Value(_trialEnabled ? _trialUnit.name : null),
         createdAt: Value(widget.payment?.createdAt ?? now),
         updatedAt: Value(now),
       );

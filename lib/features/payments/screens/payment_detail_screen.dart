@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/database_provider.dart';
 import '../../../core/models/billing_cycle.dart';
+import '../../../core/models/trial_unit.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/renewal_calculator.dart';
 import '../../../shared/widgets/color_letter_avatar.dart';
@@ -104,8 +105,18 @@ class _DetailView extends StatelessWidget {
     final startDate =
         DateTime.fromMillisecondsSinceEpoch(payment.startDate);
     final interval = payment.periodInterval;
-    final renewalDate =
-        nextRenewalDate(startDate, cycle, periodInterval: interval);
+    final trialInterval = payment.trialPeriodInterval;
+    final trialUnit = payment.trialPeriodUnit != null
+        ? TrialUnit.values.byName(payment.trialPeriodUnit!)
+        : null;
+    final inTrial = isInTrialPeriod(startDate, trialInterval, trialUnit);
+    final renewalDate = nextRenewalDate(
+      startDate,
+      cycle,
+      periodInterval: interval,
+      trialPeriodInterval: trialInterval,
+      trialPeriodUnit: trialUnit,
+    );
     final daysUntil = renewalDate.difference(DateTime.now()).inDays;
 
     DateTime? reminderDate;
@@ -155,6 +166,29 @@ class _DetailView extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (trialInterval != null && trialInterval > 0) ...[
+                      const SizedBox(height: 8),
+                      Chip(
+                        avatar: Icon(
+                          Icons.hourglass_top_outlined,
+                          size: 16,
+                          color: theme.colorScheme.tertiary,
+                        ),
+                        label: Text(
+                          'Trial',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.tertiary,
+                          ),
+                        ),
+                        backgroundColor:
+                            theme.colorScheme.tertiaryContainer,
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 0),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
                     if (categories.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       Wrap(
@@ -211,27 +245,31 @@ class _DetailView extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Renewal
+            // Renewal / Trial card
             Card(
-              color: daysUntil <= 3
-                  ? theme.colorScheme.errorContainer
-                  : theme.colorScheme.primaryContainer,
+              color: inTrial
+                  ? theme.colorScheme.tertiaryContainer
+                  : daysUntil <= 3
+                      ? theme.colorScheme.errorContainer
+                      : theme.colorScheme.primaryContainer,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
                     Icon(
-                      Icons.schedule,
-                      color: daysUntil <= 3
-                          ? theme.colorScheme.error
-                          : theme.colorScheme.primary,
+                      inTrial ? Icons.hourglass_top_outlined : Icons.schedule,
+                      color: inTrial
+                          ? theme.colorScheme.tertiary
+                          : daysUntil <= 3
+                              ? theme.colorScheme.error
+                              : theme.colorScheme.primary,
                     ),
                     const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Next renewal',
+                          inTrial ? 'Trial ends' : 'Next renewal',
                           style: theme.textTheme.labelMedium,
                         ),
                         Text(

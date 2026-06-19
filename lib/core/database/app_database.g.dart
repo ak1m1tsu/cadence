@@ -473,6 +473,27 @@ class $PaymentsTable extends Payments with TableInfo<$PaymentsTable, Payment> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _trialPeriodIntervalMeta =
+      const VerificationMeta('trialPeriodInterval');
+  @override
+  late final GeneratedColumn<int> trialPeriodInterval = GeneratedColumn<int>(
+    'trial_period_interval',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _trialPeriodUnitMeta = const VerificationMeta(
+    'trialPeriodUnit',
+  );
+  @override
+  late final GeneratedColumn<String> trialPeriodUnit = GeneratedColumn<String>(
+    'trial_period_unit',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -512,6 +533,8 @@ class $PaymentsTable extends Payments with TableInfo<$PaymentsTable, Payment> {
     reminderLeadDays,
     reminderHour,
     reminderMinute,
+    trialPeriodInterval,
+    trialPeriodUnit,
     createdAt,
     updatedAt,
   ];
@@ -650,6 +673,24 @@ class $PaymentsTable extends Payments with TableInfo<$PaymentsTable, Payment> {
         ),
       );
     }
+    if (data.containsKey('trial_period_interval')) {
+      context.handle(
+        _trialPeriodIntervalMeta,
+        trialPeriodInterval.isAcceptableOrUnknown(
+          data['trial_period_interval']!,
+          _trialPeriodIntervalMeta,
+        ),
+      );
+    }
+    if (data.containsKey('trial_period_unit')) {
+      context.handle(
+        _trialPeriodUnitMeta,
+        trialPeriodUnit.isAcceptableOrUnknown(
+          data['trial_period_unit']!,
+          _trialPeriodUnitMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -735,6 +776,14 @@ class $PaymentsTable extends Payments with TableInfo<$PaymentsTable, Payment> {
         DriftSqlType.int,
         data['${effectivePrefix}reminder_minute'],
       ),
+      trialPeriodInterval: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}trial_period_interval'],
+      ),
+      trialPeriodUnit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}trial_period_unit'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
@@ -768,6 +817,8 @@ class Payment extends DataClass implements Insertable<Payment> {
   final int? reminderLeadDays;
   final int? reminderHour;
   final int? reminderMinute;
+  final int? trialPeriodInterval;
+  final String? trialPeriodUnit;
   final int createdAt;
   final int updatedAt;
   const Payment({
@@ -786,6 +837,8 @@ class Payment extends DataClass implements Insertable<Payment> {
     this.reminderLeadDays,
     this.reminderHour,
     this.reminderMinute,
+    this.trialPeriodInterval,
+    this.trialPeriodUnit,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -816,6 +869,12 @@ class Payment extends DataClass implements Insertable<Payment> {
     }
     if (!nullToAbsent || reminderMinute != null) {
       map['reminder_minute'] = Variable<int>(reminderMinute);
+    }
+    if (!nullToAbsent || trialPeriodInterval != null) {
+      map['trial_period_interval'] = Variable<int>(trialPeriodInterval);
+    }
+    if (!nullToAbsent || trialPeriodUnit != null) {
+      map['trial_period_unit'] = Variable<String>(trialPeriodUnit);
     }
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
@@ -849,6 +908,12 @@ class Payment extends DataClass implements Insertable<Payment> {
       reminderMinute: reminderMinute == null && nullToAbsent
           ? const Value.absent()
           : Value(reminderMinute),
+      trialPeriodInterval: trialPeriodInterval == null && nullToAbsent
+          ? const Value.absent()
+          : Value(trialPeriodInterval),
+      trialPeriodUnit: trialPeriodUnit == null && nullToAbsent
+          ? const Value.absent()
+          : Value(trialPeriodUnit),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -875,6 +940,10 @@ class Payment extends DataClass implements Insertable<Payment> {
       reminderLeadDays: serializer.fromJson<int?>(json['reminderLeadDays']),
       reminderHour: serializer.fromJson<int?>(json['reminderHour']),
       reminderMinute: serializer.fromJson<int?>(json['reminderMinute']),
+      trialPeriodInterval: serializer.fromJson<int?>(
+        json['trialPeriodInterval'],
+      ),
+      trialPeriodUnit: serializer.fromJson<String?>(json['trialPeriodUnit']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
     );
@@ -898,6 +967,8 @@ class Payment extends DataClass implements Insertable<Payment> {
       'reminderLeadDays': serializer.toJson<int?>(reminderLeadDays),
       'reminderHour': serializer.toJson<int?>(reminderHour),
       'reminderMinute': serializer.toJson<int?>(reminderMinute),
+      'trialPeriodInterval': serializer.toJson<int?>(trialPeriodInterval),
+      'trialPeriodUnit': serializer.toJson<String?>(trialPeriodUnit),
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
     };
@@ -919,6 +990,8 @@ class Payment extends DataClass implements Insertable<Payment> {
     Value<int?> reminderLeadDays = const Value.absent(),
     Value<int?> reminderHour = const Value.absent(),
     Value<int?> reminderMinute = const Value.absent(),
+    Value<int?> trialPeriodInterval = const Value.absent(),
+    Value<String?> trialPeriodUnit = const Value.absent(),
     int? createdAt,
     int? updatedAt,
   }) => Payment(
@@ -941,6 +1014,12 @@ class Payment extends DataClass implements Insertable<Payment> {
     reminderMinute: reminderMinute.present
         ? reminderMinute.value
         : this.reminderMinute,
+    trialPeriodInterval: trialPeriodInterval.present
+        ? trialPeriodInterval.value
+        : this.trialPeriodInterval,
+    trialPeriodUnit: trialPeriodUnit.present
+        ? trialPeriodUnit.value
+        : this.trialPeriodUnit,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -977,6 +1056,12 @@ class Payment extends DataClass implements Insertable<Payment> {
       reminderMinute: data.reminderMinute.present
           ? data.reminderMinute.value
           : this.reminderMinute,
+      trialPeriodInterval: data.trialPeriodInterval.present
+          ? data.trialPeriodInterval.value
+          : this.trialPeriodInterval,
+      trialPeriodUnit: data.trialPeriodUnit.present
+          ? data.trialPeriodUnit.value
+          : this.trialPeriodUnit,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1000,6 +1085,8 @@ class Payment extends DataClass implements Insertable<Payment> {
           ..write('reminderLeadDays: $reminderLeadDays, ')
           ..write('reminderHour: $reminderHour, ')
           ..write('reminderMinute: $reminderMinute, ')
+          ..write('trialPeriodInterval: $trialPeriodInterval, ')
+          ..write('trialPeriodUnit: $trialPeriodUnit, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1023,6 +1110,8 @@ class Payment extends DataClass implements Insertable<Payment> {
     reminderLeadDays,
     reminderHour,
     reminderMinute,
+    trialPeriodInterval,
+    trialPeriodUnit,
     createdAt,
     updatedAt,
   );
@@ -1045,6 +1134,8 @@ class Payment extends DataClass implements Insertable<Payment> {
           other.reminderLeadDays == this.reminderLeadDays &&
           other.reminderHour == this.reminderHour &&
           other.reminderMinute == this.reminderMinute &&
+          other.trialPeriodInterval == this.trialPeriodInterval &&
+          other.trialPeriodUnit == this.trialPeriodUnit &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1065,6 +1156,8 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
   final Value<int?> reminderLeadDays;
   final Value<int?> reminderHour;
   final Value<int?> reminderMinute;
+  final Value<int?> trialPeriodInterval;
+  final Value<String?> trialPeriodUnit;
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<int> rowid;
@@ -1084,6 +1177,8 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     this.reminderLeadDays = const Value.absent(),
     this.reminderHour = const Value.absent(),
     this.reminderMinute = const Value.absent(),
+    this.trialPeriodInterval = const Value.absent(),
+    this.trialPeriodUnit = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1104,6 +1199,8 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     this.reminderLeadDays = const Value.absent(),
     this.reminderHour = const Value.absent(),
     this.reminderMinute = const Value.absent(),
+    this.trialPeriodInterval = const Value.absent(),
+    this.trialPeriodUnit = const Value.absent(),
     required int createdAt,
     required int updatedAt,
     this.rowid = const Value.absent(),
@@ -1131,6 +1228,8 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     Expression<int>? reminderLeadDays,
     Expression<int>? reminderHour,
     Expression<int>? reminderMinute,
+    Expression<int>? trialPeriodInterval,
+    Expression<String>? trialPeriodUnit,
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<int>? rowid,
@@ -1151,6 +1250,9 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
       if (reminderLeadDays != null) 'reminder_lead_days': reminderLeadDays,
       if (reminderHour != null) 'reminder_hour': reminderHour,
       if (reminderMinute != null) 'reminder_minute': reminderMinute,
+      if (trialPeriodInterval != null)
+        'trial_period_interval': trialPeriodInterval,
+      if (trialPeriodUnit != null) 'trial_period_unit': trialPeriodUnit,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1173,6 +1275,8 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     Value<int?>? reminderLeadDays,
     Value<int?>? reminderHour,
     Value<int?>? reminderMinute,
+    Value<int?>? trialPeriodInterval,
+    Value<String?>? trialPeriodUnit,
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<int>? rowid,
@@ -1193,6 +1297,8 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
       reminderLeadDays: reminderLeadDays ?? this.reminderLeadDays,
       reminderHour: reminderHour ?? this.reminderHour,
       reminderMinute: reminderMinute ?? this.reminderMinute,
+      trialPeriodInterval: trialPeriodInterval ?? this.trialPeriodInterval,
+      trialPeriodUnit: trialPeriodUnit ?? this.trialPeriodUnit,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -1247,6 +1353,12 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
     if (reminderMinute.present) {
       map['reminder_minute'] = Variable<int>(reminderMinute.value);
     }
+    if (trialPeriodInterval.present) {
+      map['trial_period_interval'] = Variable<int>(trialPeriodInterval.value);
+    }
+    if (trialPeriodUnit.present) {
+      map['trial_period_unit'] = Variable<String>(trialPeriodUnit.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
@@ -1277,6 +1389,8 @@ class PaymentsCompanion extends UpdateCompanion<Payment> {
           ..write('reminderLeadDays: $reminderLeadDays, ')
           ..write('reminderHour: $reminderHour, ')
           ..write('reminderMinute: $reminderMinute, ')
+          ..write('trialPeriodInterval: $trialPeriodInterval, ')
+          ..write('trialPeriodUnit: $trialPeriodUnit, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -2051,6 +2165,8 @@ typedef $$PaymentsTableCreateCompanionBuilder =
       Value<int?> reminderLeadDays,
       Value<int?> reminderHour,
       Value<int?> reminderMinute,
+      Value<int?> trialPeriodInterval,
+      Value<String?> trialPeriodUnit,
       required int createdAt,
       required int updatedAt,
       Value<int> rowid,
@@ -2072,6 +2188,8 @@ typedef $$PaymentsTableUpdateCompanionBuilder =
       Value<int?> reminderLeadDays,
       Value<int?> reminderHour,
       Value<int?> reminderMinute,
+      Value<int?> trialPeriodInterval,
+      Value<String?> trialPeriodUnit,
       Value<int> createdAt,
       Value<int> updatedAt,
       Value<int> rowid,
@@ -2158,6 +2276,16 @@ class $$PaymentsTableFilterComposer
 
   ColumnFilters<int> get reminderMinute => $composableBuilder(
     column: $table.reminderMinute,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get trialPeriodInterval => $composableBuilder(
+    column: $table.trialPeriodInterval,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get trialPeriodUnit => $composableBuilder(
+    column: $table.trialPeriodUnit,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2256,6 +2384,16 @@ class $$PaymentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get trialPeriodInterval => $composableBuilder(
+    column: $table.trialPeriodInterval,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get trialPeriodUnit => $composableBuilder(
+    column: $table.trialPeriodUnit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -2337,6 +2475,16 @@ class $$PaymentsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get trialPeriodInterval => $composableBuilder(
+    column: $table.trialPeriodInterval,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get trialPeriodUnit => $composableBuilder(
+    column: $table.trialPeriodUnit,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -2387,6 +2535,8 @@ class $$PaymentsTableTableManager
                 Value<int?> reminderLeadDays = const Value.absent(),
                 Value<int?> reminderHour = const Value.absent(),
                 Value<int?> reminderMinute = const Value.absent(),
+                Value<int?> trialPeriodInterval = const Value.absent(),
+                Value<String?> trialPeriodUnit = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -2406,6 +2556,8 @@ class $$PaymentsTableTableManager
                 reminderLeadDays: reminderLeadDays,
                 reminderHour: reminderHour,
                 reminderMinute: reminderMinute,
+                trialPeriodInterval: trialPeriodInterval,
+                trialPeriodUnit: trialPeriodUnit,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -2427,6 +2579,8 @@ class $$PaymentsTableTableManager
                 Value<int?> reminderLeadDays = const Value.absent(),
                 Value<int?> reminderHour = const Value.absent(),
                 Value<int?> reminderMinute = const Value.absent(),
+                Value<int?> trialPeriodInterval = const Value.absent(),
+                Value<String?> trialPeriodUnit = const Value.absent(),
                 required int createdAt,
                 required int updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -2446,6 +2600,8 @@ class $$PaymentsTableTableManager
                 reminderLeadDays: reminderLeadDays,
                 reminderHour: reminderHour,
                 reminderMinute: reminderMinute,
+                trialPeriodInterval: trialPeriodInterval,
+                trialPeriodUnit: trialPeriodUnit,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/models/billing_cycle.dart';
+import '../../../core/models/trial_unit.dart';
 import '../../../core/services/renewal_calculator.dart';
 import '../../../shared/widgets/color_letter_avatar.dart';
 import '../providers/payments_provider.dart';
@@ -26,8 +27,18 @@ class PaymentCard extends ConsumerWidget {
     final startDate =
         DateTime.fromMillisecondsSinceEpoch(payment.startDate);
     final interval = payment.periodInterval;
-    final renewalDate =
-        nextRenewalDate(startDate, cycle, periodInterval: interval);
+    final trialInterval = payment.trialPeriodInterval;
+    final trialUnit = payment.trialPeriodUnit != null
+        ? TrialUnit.values.byName(payment.trialPeriodUnit!)
+        : null;
+    final inTrial = isInTrialPeriod(startDate, trialInterval, trialUnit);
+    final renewalDate = nextRenewalDate(
+      startDate,
+      cycle,
+      periodInterval: interval,
+      trialPeriodInterval: trialInterval,
+      trialPeriodUnit: trialUnit,
+    );
     final daysUntil = renewalDate.difference(DateTime.now()).inDays;
 
     final intervalStr = interval == 1 ? '' : '$interval';
@@ -76,7 +87,10 @@ class PaymentCard extends ConsumerWidget {
                     Row(
                       children: [
                         _RenewalChip(
-                            daysUntil: daysUntil, renewalDate: renewalDate),
+                          daysUntil: daysUntil,
+                          renewalDate: renewalDate,
+                          inTrial: inTrial,
+                        ),
                         if (payment.reminderLeadDays != null) ...[
                           const SizedBox(width: 6),
                           Icon(Icons.notifications_active_outlined,
@@ -136,33 +150,51 @@ class PaymentCard extends ConsumerWidget {
 class _RenewalChip extends StatelessWidget {
   final int daysUntil;
   final DateTime renewalDate;
+  final bool inTrial;
 
-  const _RenewalChip({required this.daysUntil, required this.renewalDate});
+  const _RenewalChip({
+    required this.daysUntil,
+    required this.renewalDate,
+    required this.inTrial,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final Color color;
     final String label;
+    final IconData icon;
 
-    if (daysUntil == 0) {
+    if (inTrial) {
+      color = theme.colorScheme.tertiary;
+      label = daysUntil == 0
+          ? 'Trial ends today'
+          : daysUntil == 1
+              ? 'Trial ends tomorrow'
+              : 'Trial – $daysUntil days left';
+      icon = Icons.hourglass_top_outlined;
+    } else if (daysUntil == 0) {
       color = theme.colorScheme.error;
       label = 'Renews today';
+      icon = Icons.calendar_today;
     } else if (daysUntil <= 3) {
       color = theme.colorScheme.error;
       label = 'In $daysUntil day${daysUntil == 1 ? '' : 's'}';
+      icon = Icons.calendar_today;
     } else if (daysUntil <= 7) {
       color = Colors.orange;
       label = 'In $daysUntil days';
+      icon = Icons.calendar_today;
     } else {
       color = theme.colorScheme.outline;
       label = DateFormat('MMM d').format(renewalDate);
+      icon = Icons.calendar_today;
     }
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.calendar_today, size: 12, color: color),
+        Icon(icon, size: 12, color: color),
         const SizedBox(width: 4),
         Text(
           label,
