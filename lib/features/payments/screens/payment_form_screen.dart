@@ -483,10 +483,13 @@ class _PaymentFormScreenState
       try {
         await NotificationService.cancelReminder(id);
         if (_reminderLeadDays != null) {
-          final renewal = nextRenewalDate(
+          final renewal = nextRenewalDateForReminder(
             _startDate,
             _billingCycle,
             periodInterval: interval,
+            leadDays: _reminderLeadDays!,
+            reminderHour: _reminderTime.hour,
+            reminderMinute: _reminderTime.minute,
           );
           await NotificationService.scheduleRenewalReminder(
             paymentId: id,
@@ -499,8 +502,8 @@ class _PaymentFormScreenState
             reminderMinute: _reminderTime.minute,
           );
         }
-      } catch (_) {
-        // Non-fatal
+      } catch (e) {
+        debugPrint('PaymentFormScreen: failed to (re)schedule reminder: $e');
       }
     } catch (e) {
       if (mounted) {

@@ -64,8 +64,9 @@ class _StartupWrapper extends ConsumerWidget {
         final db = ref.read(appDatabaseProvider);
         final payments = await db.paymentsDao.getAllActiveOnce();
         await NotificationService.rescheduleAll(payments);
-      } catch (_) {
+      } catch (e) {
         // Non-fatal: notifications will be scheduled when payments are saved
+        debugPrint('Startup reschedule failed: $e');
       }
     });
   }

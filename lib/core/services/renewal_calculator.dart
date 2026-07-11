@@ -49,6 +49,38 @@ int daysUntilRenewal(
   return next.difference(DateTime.now()).inDays;
 }
 
+/// Like [nextRenewalDate], but also accounts for [leadDays]: keeps advancing
+/// to the following renewal until the reminder trigger time (renewal date
+/// minus [leadDays], at [reminderHour]:[reminderMinute]) is still in the
+/// future. Without this, a lead time close to or longer than the billing
+/// cycle would always compute a trigger time in the past.
+DateTime nextRenewalDateForReminder(
+  DateTime startDate,
+  BillingCycle cycle, {
+  int periodInterval = 1,
+  required int leadDays,
+  int reminderHour = 9,
+  int reminderMinute = 0,
+  int? trialPeriodInterval,
+  TrialUnit? trialPeriodUnit,
+}) {
+  var renewal = nextRenewalDate(
+    startDate,
+    cycle,
+    periodInterval: periodInterval,
+    trialPeriodInterval: trialPeriodInterval,
+    trialPeriodUnit: trialPeriodUnit,
+  );
+  DateTime triggerFor(DateTime r) {
+    final base = r.subtract(Duration(days: leadDays));
+    return DateTime(base.year, base.month, base.day, reminderHour, reminderMinute);
+  }
+  while (triggerFor(renewal).isBefore(DateTime.now())) {
+    renewal = advanceByCycle(renewal, cycle, periodInterval);
+  }
+  return renewal;
+}
+
 DateTime advanceByCycle(DateTime date, BillingCycle cycle, int periodInterval) =>
     _advance(date, cycle, periodInterval);
 

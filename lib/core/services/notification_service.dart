@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -71,6 +71,9 @@ class NotificationService {
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
           ?.requestNotificationsPermission();
+      // Scheduled reminders use AndroidScheduleMode.exactAllowWhileIdle,
+      // which needs this separate permission on Android 12+.
+      if (granted ?? false) await requestExactAlarmPermission();
       return granted ?? false;
     }
     if (Platform.isMacOS) {
@@ -81,6 +84,27 @@ class NotificationService {
       return granted ?? false;
     }
     return false;
+  }
+
+  /// Returns true if the app can schedule exact alarms. Always true on
+  /// platforms/OS versions where this permission doesn't apply.
+  static Future<bool> hasExactAlarmPermission() async {
+    if (!_supported || !Platform.isAndroid) return true;
+    final can = await _plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.canScheduleExactNotifications();
+    return can ?? false;
+  }
+
+  /// Requests the Android "schedule exact alarms" permission (Android 12+).
+  static Future<bool> requestExactAlarmPermission() async {
+    if (!_supported || !Platform.isAndroid) return true;
+    final granted = await _plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestExactAlarmsPermission();
+    return granted ?? false;
   }
 
   /// Returns the payment ID if the app was launched by tapping a
@@ -180,22 +204,37 @@ class NotificationService {
   static Future<void> rescheduleAll(List<Payment> payments) async {
     if (!_supported) return;
     for (final payment in payments) {
-      final leadDays = payment.reminderLeadDays;
-      if (leadDays == null) continue;
-      final cycle = BillingCycle.fromDb(payment.billingCycle);
-      final startDate = DateTime.fromMillisecondsSinceEpoch(payment.startDate);
-      final renewalDate =
-          nextRenewalDate(startDate, cycle, periodInterval: payment.periodInterval);
-      await scheduleRenewalReminder(
-        paymentId: payment.id,
-        name: payment.name,
-        renewalDate: renewalDate,
-        leadDays: leadDays,
-        price: payment.price,
-        currencyCode: payment.currencyCode,
-        reminderHour: payment.reminderHour ?? 9,
-        reminderMinute: payment.reminderMinute ?? 0,
-      );
+      try {
+        final leadDays = payment.reminderLeadDays;
+        if (leadDays == null) continue;
+        final cycle = BillingCycle.fromDb(payment.billingCycle);
+        final startDate =
+            DateTime.fromMillisecondsSinceEpoch(payment.startDate);
+        final reminderHour = payment.reminderHour ?? 9;
+        final reminderMinute = payment.reminderMinute ?? 0;
+        final renewalDate = nextRenewalDateForReminder(
+          startDate,
+          cycle,
+          periodInterval: payment.periodInterval,
+          leadDays: leadDays,
+          reminderHour: reminderHour,
+          reminderMinute: reminderMinute,
+        );
+        await scheduleRenewalReminder(
+          paymentId: payment.id,
+          name: payment.name,
+          renewalDate: renewalDate,
+          leadDays: leadDays,
+          price: payment.price,
+          currencyCode: payment.currencyCode,
+          reminderHour: reminderHour,
+          reminderMinute: reminderMinute,
+        );
+      } catch (e) {
+        // Don't let one payment's scheduling failure block the rest.
+        debugPrint('NotificationService.rescheduleAll: failed for payment '
+            '${payment.id}: $e');
+      }
     }
   }
 
