@@ -25,8 +25,9 @@ DateTime nextRenewalDate(
       : startDate;
   final now = DateTime.now();
   if (hasTrial && now.isBefore(billingStart)) return billingStart;
+  final today = DateTime(now.year, now.month, now.day);
   var date = billingStart;
-  while (!date.isAfter(now)) {
+  while (DateTime(date.year, date.month, date.day).isBefore(today)) {
     date = _advance(date, cycle, periodInterval);
   }
   return date;

@@ -15,6 +15,10 @@ import 'features/upcoming/screens/upcoming_screen.dart';
 // Shared navigator key — notification handler uses this to push screens.
 final appNavigatorKey = GlobalKey<NavigatorState>();
 
+// Shared scaffold messenger key — lets code without a screen-level
+// BuildContext (startup reschedule, save-then-pop flows) show snackbars.
+final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
 // Persisted view-mode toggle — kept globally so it survives screen navigation.
 final paymentViewIsGridProvider = StateProvider<bool>((ref) => false);
 
@@ -76,6 +80,7 @@ class _AppState extends ConsumerState<App> {
       title: 'Cadence',
       debugShowCheckedModeBanner: false,
       navigatorKey: appNavigatorKey,
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: themeMode,

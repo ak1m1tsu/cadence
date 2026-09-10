@@ -10,6 +10,51 @@ import '../database/app_database.dart';
 import '../models/billing_cycle.dart';
 import 'renewal_calculator.dart';
 
+enum ReminderScheduleOutcome {
+  scheduledExact,
+  scheduledInexact,
+  skippedPast,
+  failed,
+  unsupported,
+}
+
+class ReminderScheduleResult {
+  final ReminderScheduleOutcome outcome;
+  final Object? error;
+  const ReminderScheduleResult(this.outcome, [this.error]);
+
+  bool get succeeded =>
+      outcome == ReminderScheduleOutcome.scheduledExact ||
+      outcome == ReminderScheduleOutcome.scheduledInexact;
+}
+
+class RescheduleSummary {
+  final int exact;
+  final int inexact;
+  final int failed;
+  final int skipped;
+
+  const RescheduleSummary({
+    this.exact = 0,
+    this.inexact = 0,
+    this.failed = 0,
+    this.skipped = 0,
+  });
+
+  bool get hasIssues => failed > 0 || inexact > 0;
+
+  RescheduleSummary add(ReminderScheduleOutcome o) => switch (o) {
+        ReminderScheduleOutcome.scheduledExact => RescheduleSummary(
+            exact: exact + 1, inexact: inexact, failed: failed, skipped: skipped),
+        ReminderScheduleOutcome.scheduledInexact => RescheduleSummary(
+            exact: exact, inexact: inexact + 1, failed: failed, skipped: skipped),
+        ReminderScheduleOutcome.skippedPast => RescheduleSummary(
+            exact: exact, inexact: inexact, failed: failed, skipped: skipped + 1),
+        _ => RescheduleSummary(
+            exact: exact, inexact: inexact, failed: failed + 1, skipped: skipped),
+      };
+}
+
 class NotificationService {
   static final _plugin = FlutterLocalNotificationsPlugin();
 
@@ -118,7 +163,7 @@ class NotificationService {
     return null;
   }
 
-  static Future<void> scheduleRenewalReminder({
+  static Future<ReminderScheduleResult> scheduleRenewalReminder({
     required String paymentId,
     required String name,
     required DateTime renewalDate,
@@ -128,12 +173,16 @@ class NotificationService {
     int reminderHour = 9,
     int reminderMinute = 0,
   }) async {
-    if (!_supported) return;
+    if (!_supported) {
+      return const ReminderScheduleResult(ReminderScheduleOutcome.unsupported);
+    }
 
     final base = renewalDate.subtract(Duration(days: leadDays));
     final notifDate = DateTime(
         base.year, base.month, base.day, reminderHour, reminderMinute);
-    if (notifDate.isBefore(DateTime.now())) return;
+    if (notifDate.isBefore(DateTime.now())) {
+      return const ReminderScheduleResult(ReminderScheduleOutcome.skippedPast);
+    }
 
     final id = paymentId.hashCode.abs() % 100000;
     final tzDate = tz.TZDateTime.from(notifDate, tz.local);
@@ -141,26 +190,44 @@ class NotificationService {
     final dateStr = DateFormat('MMM d, y').format(renewalDate);
     final priceStr = _formatPrice(price, currencyCode);
 
-    await _plugin.zonedSchedule(
-      id,
-      'Renewal: $name',
-      'Renews on $dateStr for $priceStr',
-      tzDate,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'renewal_reminders',
-          'Renewal Reminders',
-          channelDescription: 'Notifies before payment renewals',
-          importance: Importance.high,
-          priority: Priority.high,
+    // Exact scheduling needs the "Alarms & reminders" permission on Android
+    // 12+. Fall back to an inexact alarm (still fires, just not to-the-
+    // minute) instead of letting zonedSchedule throw and drop the reminder.
+    var mode = AndroidScheduleMode.exactAllowWhileIdle;
+    var exact = true;
+    if (Platform.isAndroid) {
+      exact = await hasExactAlarmPermission();
+      if (!exact) mode = AndroidScheduleMode.inexactAllowWhileIdle;
+    }
+
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        'Renewal: $name',
+        'Renews on $dateStr for $priceStr',
+        tzDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'renewal_reminders',
+            'Renewal Reminders',
+            channelDescription: 'Notifies before payment renewals',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          macOS: DarwinNotificationDetails(),
         ),
-        macOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: paymentId,
-    );
+        androidScheduleMode: mode,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: paymentId,
+      );
+    } catch (e) {
+      return ReminderScheduleResult(ReminderScheduleOutcome.failed, e);
+    }
+
+    return ReminderScheduleResult(exact
+        ? ReminderScheduleOutcome.scheduledExact
+        : ReminderScheduleOutcome.scheduledInexact);
   }
 
   static Future<void> cancelReminder(String paymentId) async {
@@ -201,8 +268,10 @@ class NotificationService {
   }
 
   // Reschedule all reminders using each payment's own lead days
-  static Future<void> rescheduleAll(List<Payment> payments) async {
-    if (!_supported) return;
+  static Future<RescheduleSummary> rescheduleAll(
+      List<Payment> payments) async {
+    var summary = const RescheduleSummary();
+    if (!_supported) return summary;
     for (final payment in payments) {
       try {
         final leadDays = payment.reminderLeadDays;
@@ -220,7 +289,7 @@ class NotificationService {
           reminderHour: reminderHour,
           reminderMinute: reminderMinute,
         );
-        await scheduleRenewalReminder(
+        final result = await scheduleRenewalReminder(
           paymentId: payment.id,
           name: payment.name,
           renewalDate: renewalDate,
@@ -230,12 +299,15 @@ class NotificationService {
           reminderHour: reminderHour,
           reminderMinute: reminderMinute,
         );
+        summary = summary.add(result.outcome);
       } catch (e) {
         // Don't let one payment's scheduling failure block the rest.
         debugPrint('NotificationService.rescheduleAll: failed for payment '
             '${payment.id}: $e');
+        summary = summary.add(ReminderScheduleOutcome.failed);
       }
     }
+    return summary;
   }
 
   static String _formatPrice(double price, String currencyCode) =>

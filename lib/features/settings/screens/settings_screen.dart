@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
@@ -10,11 +12,30 @@ import '../../../features/categories/screens/categories_screen.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/currency_picker.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool? _exactAlarmGranted;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshExactAlarmStatus();
+  }
+
+  Future<void> _refreshExactAlarmStatus() async {
+    if (!Platform.isAndroid || !NotificationService.isSupported) return;
+    final granted = await NotificationService.hasExactAlarmPermission();
+    if (mounted) setState(() => _exactAlarmGranted = granted);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
 
@@ -167,15 +188,35 @@ class SettingsScreen extends ConsumerWidget {
                           .read(appDatabaseProvider)
                           .paymentsDao
                           .getAllActiveOnce();
-                      await NotificationService.rescheduleAll(subs);
+                      final summary =
+                          await NotificationService.rescheduleAll(subs);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Reminders rescheduled')),
+                          SnackBar(
+                            content: Text(
+                                'Rescheduled: ${summary.exact} exact, '
+                                '${summary.inexact} approximate, '
+                                '${summary.failed} failed'),
+                          ),
                         );
                       }
                     },
                   ),
+                  if (Platform.isAndroid && NotificationService.isSupported)
+                    _CustomListTile(
+                      icon: CupertinoIcons.alarm,
+                      title: 'Exact alarm permission',
+                      subtitle: _exactAlarmGranted == null
+                          ? 'Checking…'
+                          : _exactAlarmGranted!
+                              ? 'Enabled — reminders fire at the exact time'
+                              : 'Disabled — reminders may arrive late',
+                      trailing: const Icon(CupertinoIcons.forward, size: 18),
+                      onTap: () async {
+                        await NotificationService.requestExactAlarmPermission();
+                        await _refreshExactAlarmStatus();
+                      },
+                    ),
                 ],
               ),
 

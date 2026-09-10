@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../app.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/database_provider.dart';
 import '../../../core/models/billing_cycle.dart';
@@ -82,6 +85,20 @@ class _PaymentFormScreenState
         );
         return;
       }
+    }
+    if (Platform.isAndroid &&
+        !await NotificationService.hasExactAlarmPermission()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+              'Enable "Alarms & reminders" for exact-time reminders'),
+          action: SnackBarAction(
+            label: 'Enable',
+            onPressed: () => NotificationService.requestExactAlarmPermission(),
+          ),
+        ),
+      );
     }
     setState(() => _reminderLeadDays = v);
   }
@@ -491,7 +508,7 @@ class _PaymentFormScreenState
             reminderHour: _reminderTime.hour,
             reminderMinute: _reminderTime.minute,
           );
-          await NotificationService.scheduleRenewalReminder(
+          final result = await NotificationService.scheduleRenewalReminder(
             paymentId: id,
             name: _nameCtrl.text.trim(),
             renewalDate: renewal,
@@ -501,9 +518,13 @@ class _PaymentFormScreenState
             reminderHour: _reminderTime.hour,
             reminderMinute: _reminderTime.minute,
           );
+          _showReminderResultSnackBar(result);
         }
       } catch (e) {
         debugPrint('PaymentFormScreen: failed to (re)schedule reminder: $e');
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          const SnackBar(content: Text('Failed to schedule reminder')),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -516,5 +537,33 @@ class _PaymentFormScreenState
     }
 
     if (mounted) Navigator.pop(context);
+  }
+
+  void _showReminderResultSnackBar(ReminderScheduleResult result) {
+    final messenger = rootScaffoldMessengerKey.currentState;
+    if (messenger == null) return;
+    switch (result.outcome) {
+      case ReminderScheduleOutcome.scheduledExact:
+      case ReminderScheduleOutcome.unsupported:
+      case ReminderScheduleOutcome.skippedPast:
+        break;
+      case ReminderScheduleOutcome.scheduledInexact:
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Reminder scheduled (approximate — enable exact alarms for precise timing)'),
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: () => NotificationService.requestExactAlarmPermission(),
+            ),
+          ),
+        );
+        break;
+      case ReminderScheduleOutcome.failed:
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Failed to schedule reminder')),
+        );
+        break;
+    }
   }
 }

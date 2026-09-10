@@ -9,6 +9,7 @@ import 'app.dart';
 import 'core/database/database_provider.dart';
 import 'core/services/notification_service.dart';
 import 'features/settings/providers/settings_provider.dart';
+import 'features/settings/screens/settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,10 +64,30 @@ class _StartupWrapper extends ConsumerWidget {
       try {
         final db = ref.read(appDatabaseProvider);
         final payments = await db.paymentsDao.getAllActiveOnce();
-        await NotificationService.rescheduleAll(payments);
+        final summary = await NotificationService.rescheduleAll(payments);
+        if (summary.hasIssues) {
+          rootScaffoldMessengerKey.currentState?.showSnackBar(
+            SnackBar(
+              content: Text(summary.failed > 0
+                  ? 'Some reminders failed to schedule — check Settings'
+                  : 'Some reminders could only be scheduled approximately — '
+                      'check Settings'),
+              action: SnackBarAction(
+                label: 'Settings',
+                onPressed: () => appNavigatorKey.currentState?.push(
+                  MaterialPageRoute(
+                      builder: (_) => const SettingsScreen()),
+                ),
+              ),
+            ),
+          );
+        }
       } catch (e) {
         // Non-fatal: notifications will be scheduled when payments are saved
         debugPrint('Startup reschedule failed: $e');
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          const SnackBar(content: Text('Failed to reschedule reminders')),
+        );
       }
     });
   }
