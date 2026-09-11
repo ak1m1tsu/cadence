@@ -48,6 +48,12 @@ android {
             manifestPlaceholders["appLabel"] = "Cadence Dev"
         }
         release {
+            // R8 shrinking strips Gson-reflected fields flutter_local_notifications
+            // uses to serialize scheduled alarms, throwing at schedule time with no
+            // proguard keep rules in place. Keep shrinking off until proper keep
+            // rules are added and verified on a real release build.
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
