@@ -147,7 +147,7 @@ class _GridCard extends ConsumerWidget {
     final interval = payment.periodInterval;
     final renewalDate =
         nextRenewalDate(startDate, cycle, periodInterval: interval);
-    final daysUntil = renewalDate.difference(DateTime.now()).inDays;
+    final daysUntil = daysUntilDate(renewalDate);
     final isUrgent = daysUntil <= 3;
 
     final intervalStr = interval == 1 ? '' : '$interval';

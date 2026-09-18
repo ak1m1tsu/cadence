@@ -39,7 +39,7 @@ class PaymentCard extends ConsumerWidget {
       trialPeriodInterval: trialInterval,
       trialPeriodUnit: trialUnit,
     );
-    final daysUntil = renewalDate.difference(DateTime.now()).inDays;
+    final daysUntil = daysUntilDate(renewalDate);
 
     final intervalStr = interval == 1 ? '' : '$interval';
     final priceText =

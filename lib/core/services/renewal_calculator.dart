@@ -47,7 +47,16 @@ int daysUntilRenewal(
     trialPeriodInterval: trialPeriodInterval,
     trialPeriodUnit: trialPeriodUnit,
   );
-  return next.difference(DateTime.now()).inDays;
+  return daysUntilDate(next);
+}
+
+/// Number of calendar days between [target] and [from] (defaults to now),
+/// comparing dates only so time-of-day doesn't cause off-by-one results.
+int daysUntilDate(DateTime target, [DateTime? from]) {
+  final now = from ?? DateTime.now();
+  final targetDay = DateTime(target.year, target.month, target.day);
+  final today = DateTime(now.year, now.month, now.day);
+  return targetDay.difference(today).inDays;
 }
 
 /// Like [nextRenewalDate], but also accounts for [leadDays]: keeps advancing

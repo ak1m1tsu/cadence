@@ -117,7 +117,7 @@ class _DetailView extends StatelessWidget {
       trialPeriodInterval: trialInterval,
       trialPeriodUnit: trialUnit,
     );
-    final daysUntil = renewalDate.difference(DateTime.now()).inDays;
+    final daysUntil = daysUntilDate(renewalDate);
 
     DateTime? reminderDate;
     if (payment.reminderLeadDays != null) {

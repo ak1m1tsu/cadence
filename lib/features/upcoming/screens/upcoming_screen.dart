@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/services/renewal_calculator.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 import '../../payments/providers/payments_provider.dart';
@@ -304,7 +305,7 @@ class _RenewalTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final r = renewal;
-    final daysUntil = r.renewalDate.difference(DateTime.now()).inDays;
+    final daysUntil = daysUntilDate(r.renewalDate);
     final isUrgent = daysUntil <= 3;
 
     return ListTile(
