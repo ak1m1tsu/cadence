@@ -4,12 +4,14 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 
 import '../../../core/database/database_provider.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../features/categories/screens/categories_screen.dart';
 import '../providers/settings_provider.dart';
+import '../providers/update_provider.dart';
 import '../widgets/currency_picker.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -21,11 +23,13 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool? _exactAlarmGranted;
+  String? _appVersion;
 
   @override
   void initState() {
     super.initState();
     _refreshExactAlarmStatus();
+    _loadAppVersion();
   }
 
   Future<void> _refreshExactAlarmStatus() async {
@@ -34,10 +38,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) setState(() => _exactAlarmGranted = granted);
   }
 
+  Future<void> _loadAppVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) setState(() => _appVersion = info.version);
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
+    final updateStatus = ref.watch(updateStatusProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -242,8 +252,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _CustomListTile(
                     icon: CupertinoIcons.info_circle,
                     title: 'Cadence',
-                    subtitle: 'Version ${const String.fromEnvironment('APP_VERSION', defaultValue: 'dev')}',
-                    trailing: const SizedBox(),
+                    subtitle: 'Version ${_appVersion ?? '…'}',
+                    trailing: updateStatus.isUpdateAvailable
+                        ? FilledButton.tonal(
+                            onPressed: updateStatus.isDownloading
+                                ? null
+                                : () => ref
+                                    .read(updateStatusProvider.notifier)
+                                    .downloadAndInstall(updateStatus.release!),
+                            child: updateStatus.isDownloading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : const Text('Update'),
+                          )
+                        : const SizedBox(),
                     onTap: null,
                   ),
                 ],

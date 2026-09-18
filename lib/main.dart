@@ -9,6 +9,7 @@ import 'app.dart';
 import 'core/database/database_provider.dart';
 import 'core/services/notification_service.dart';
 import 'features/settings/providers/settings_provider.dart';
+import 'features/settings/providers/update_provider.dart';
 import 'features/settings/screens/settings_screen.dart';
 
 void main() async {
@@ -53,6 +54,7 @@ class _StartupWrapper extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Fire-and-forget reschedule on first build
     _rescheduleOnce(ref);
+    _checkUpdateOnce(ref);
     return App(initialPaymentId: initialPaymentId);
   }
 
@@ -90,5 +92,14 @@ class _StartupWrapper extends ConsumerWidget {
         );
       }
     });
+  }
+
+  static bool _updateChecked = false;
+  void _checkUpdateOnce(WidgetRef ref) {
+    if (_updateChecked) return;
+    _updateChecked = true;
+    Future.microtask(
+      () => ref.read(updateStatusProvider.notifier).checkAndPromptOnStartup(),
+    );
   }
 }

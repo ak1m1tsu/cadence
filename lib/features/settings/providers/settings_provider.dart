@@ -28,6 +28,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
           baseCurrency: _prefs.getString('base_currency') ?? 'USD',
           themeMode: _themeModeFromString(_prefs.getString('theme_mode')),
           developerMode: _prefs.getBool('developer_mode') ?? false,
+          dismissedUpdateVersion: _prefs.getString('dismissed_update_version'),
         ));
 
   Future<void> setBaseCurrency(String currency) async {
@@ -43,6 +44,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> setDeveloperMode(bool enabled) async {
     await _prefs.setBool('developer_mode', enabled);
     state = state.copyWith(developerMode: enabled);
+  }
+
+  Future<void> setDismissedUpdateVersion(String version) async {
+    await _prefs.setString('dismissed_update_version', version);
+    state = state.copyWith(dismissedUpdateVersion: version);
   }
 }
 
